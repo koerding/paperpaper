@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
 import { 
   extractTextFromFile, 
-  extractDocumentStructure,
-  validateDocumentSize,
-  prepareForAnalysis 
+  validateDocumentSize
 } from '@/services/ProcessingService'
 import { analyzeDocumentStructure } from '@/services/AIService'
 import { 
@@ -75,14 +73,18 @@ export async function POST(request) {
       )
     }
     
-    // Extract document structure
-    const documentStructure = extractDocumentStructure(fileText)
+    // We'll pass the raw text to the AI service to handle both parsing and analysis
+    // This approach allows the AI to first parse the document structure and then analyze it
     
-    // Prepare for analysis
-    const preparedDocument = prepareForAnalysis(documentStructure)
+    // Prepare minimal document structure just to have something to work with
+    const basicDocument = {
+      title: fileText.split('\n')[0] || 'Untitled Document',
+      abstract: '',
+      sections: []
+    }
     
-    // Analyze document structure
-    const analysisResults = await analyzeDocumentStructure(preparedDocument)
+    // Analyze document structure using AI for both parsing and analysis
+    const analysisResults = await analyzeDocumentStructure(basicDocument, fileText)
     
     // Save results to file
     const resultsPath = await saveResults(analysisResults, submissionId)
