@@ -1,91 +1,101 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+import FileUploader from '@/components/FileUploader'
+import HistoryDisplay from '@/components/HistoryDisplay'
 import { useAppContext } from '@/context/AppContext'
-import ResultsDisplay from '@/components/ResultsDisplay'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
-export default function ResultsPage() {
-  const searchParams = useSearchParams()
-  const submissionId = searchParams.get('id')
-  const { getSubmission } = useAppContext()
-  const [submission, setSubmission] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+export default function Home() {
+  const { 
+    isProcessing, 
+    error, 
+    setError,
+    addSubmission, 
+    updateSubmissionResults 
+  } = useAppContext()
+  
+  const router = useRouter()
+  const [activeTab, setActiveTab] = useState('upload')
 
-  useEffect(() => {
-    if (submissionId) {
-      const sub = getSubmission(submissionId)
-      if (sub) {
-        setSubmission(sub)
-      } else {
-        setError('Submission not found')
+  // Handle file upload and processing
+  const handleFileSubmit = async (file, fileText) => {
+    try {
+      // Add submission to context
+      const submissionId = addSubmission({
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        status: 'processing',
+      })
+
+      // Send to API for analysis
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      // Process text directly if available, otherwise server will extract it
+      if (fileText) {
+        formData.append('fileText', fileText)
       }
-      setLoading(false)
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Error analyzing document')
+      }
+
+      const results = await response.json()
+      
+      // Update submission with results
+      updateSubmissionResults(submissionId, results)
+      
+      // Navigate to results page
+      router.push(`/results?id=${submissionId}`)
+    } catch (err) {
+      console.error('Error processing file:', err)
+      setError(err.message || 'Error processing file')
     }
-  }, [submissionId, getSubmission])
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
-  if (error || !submission) {
-    return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="text-lg font-medium text-destructive">
-          {error || 'Submission not found'}
-        </div>
-        <Link 
-          href="/"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
-        >
-          Back to Home
-        </Link>
-      </div>
-    )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Analysis Results</h2>
-        <Link 
-          href="/"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+    <div className="flex flex-col space-y-8">
+      <div className="flex justify-center border-b">
+        <button
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'upload' 
+              ? 'border-b-2 border-primary' 
+              : 'text-muted-foreground'
+          }`}
+          onClick={() => setActiveTab('upload')}
         >
-          New Analysis
-        </Link>
+          Upload Paper
+        </button>
+        <button
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'history' 
+              ? 'border-b-2 border-primary' 
+              : 'text-muted-foreground'
+          }`}
+          onClick={() => setActiveTab('history')}
+        >
+          Submission History
+        </button>
       </div>
-      
-      <div className="border rounded-md p-4 bg-muted/20">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">File Name</p>
-            <p className="font-medium">{submission.fileName}</p>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Date Submitted</p>
-            <p className="font-medium">
-              {new Date(submission.date).toLocaleString()}
-            </p>
-          </div>
+
+      {error && (
+        <div className="bg-destructive/10 text-destructive p-4 rounded-md">
+          {error}
         </div>
-      </div>
-      
-      {submission.status === 'processing' ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="text-lg">Analyzing your paper...</p>
-          </div>
-        </div>
+      )}
+
+      {activeTab === 'upload' ? (
+        <FileUploader onFileSubmit={handleFileSubmit} isProcessing={isProcessing} />
       ) : (
-        <ResultsDisplay results={submission.results} />
+        <HistoryDisplay />
       )}
     </div>
   )
