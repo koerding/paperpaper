@@ -1,14 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    serverActions: true,
-  },
-  // Set limit for file uploads (100MB max)
-  api: {
-    bodyParser: {
-      sizeLimit: '100mb',
-    },
+  // Server Actions are now enabled by default in Next.js 14
+  // Remove the experimental.serverActions config
+  experimental: {},
+  // Move bodyParser config to correct location
+  async headers() {
+    return [
+      {
+        source: '/api/(.*)',
+        headers: [
+          {
+            key: 'x-content-type-options',
+            value: 'nosniff',
+          },
+        ],
+      },
+    ];
   },
 }
 
