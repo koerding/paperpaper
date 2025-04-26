@@ -4,9 +4,9 @@
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Cloud, FileText, AlertCircle } from 'lucide-react'
-import { useAppContext } from '@/context/AppContext.jsx' // Added .jsx
-// Ensure this path is correct and the function is exported from ProcessingService.js
-import { extractTextFromFile } from '@/services/ProcessingService.js' // Added .js
+// Using relative paths for imports from other src subdirectories
+import { useAppContext } from '../context/AppContext.jsx'
+import { extractTextFromFile } from '../services/ProcessingService.js'
 
 export default function FileUploader({ onFileSubmit, isProcessing }) {
   const { setIsProcessing, setError } = useAppContext()
@@ -42,7 +42,8 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
       'text/x-tex', // tex
       'application/x-tex', // tex alternative
     ];
-    if (!validTypes.includes(uploadedFile.type) && !uploadedFile.name.endsWith('.tex')) {
+    // Use optional chaining for name check
+    if (!validTypes.includes(uploadedFile.type) && !uploadedFile.name?.endsWith('.tex')) {
         const errorMsg = 'Unsupported file type. Please upload .docx, .txt, .md, or .tex files.';
         console.error('[FileUploader] Validation Error:', errorMsg);
         setError(errorMsg);
