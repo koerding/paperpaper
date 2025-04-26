@@ -1,4 +1,4 @@
-// File Path: src/services/AIservice.js
+// File Path: src/services/AIService.js
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
 import path from 'path';
@@ -16,9 +16,8 @@ try {
     console.log("[AIService] Successfully loaded rules.json");
 } catch (err) {
     console.error("[AIService] CRITICAL ERROR: Failed to load or parse rules.json.", err);
-    // If rules are essential, throw an error or handle appropriately
-    // throw new Error("Could not load analysis rules.");
-    paperRules = { rules: [] }; // Use empty rules as fallback? Decide strategy.
+    // Use empty rules as fallback
+    paperRules = { rules: [] };
 }
 
 // DEBUG HELPER: Write content to debug file
@@ -248,10 +247,7 @@ export async function analyzeDocumentStructure(document, rawText) {
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Or your preferred model
 
-        // Step 3: Perform Paragraph Analysis
-        console.log('[AIService] Starting paragraph analysis...');
-        
-        // Prepare full document text for analysis
+        // Step 3: Prepare full document text for analysis
         let fullText = '';
         if (structuredDoc.title) fullText += structuredDoc.title + '\n\n';
         if (structuredDoc.abstract?.text) fullText += structuredDoc.abstract.text + '\n\n';
@@ -270,7 +266,8 @@ export async function analyzeDocumentStructure(document, rawText) {
         
         await writeDebugFile('02-full-text-for-analysis', fullText);
         
-        // Analyze paragraphs
+        // Step 4: Analyze paragraphs
+        console.log('[AIService] Starting paragraph analysis...');
         const paragraphPromptMessages = createParagraphAnalysisPrompt(fullText, paperRules);
         await writeDebugFile('03-paragraph-prompt', paragraphPromptMessages);
         
@@ -303,7 +300,7 @@ export async function analyzeDocumentStructure(document, rawText) {
         
         console.log(`[AIService] Paragraph analysis complete. Found ${paragraphAnalysisResults.paragraphs?.length || 0} paragraphs.`);
 
-        // Step 4: Perform Document-Level Analysis
+        // Step 5: Perform Document-Level Analysis
         console.log('[AIService] Starting document-level analysis...');
         const documentPromptMessages = createDocumentAnalysisPrompt(
             structuredDoc.title,
@@ -341,7 +338,7 @@ export async function analyzeDocumentStructure(document, rawText) {
         
         console.log('[AIService] Document-level analysis complete.');
 
-        // Step 5: Merge Results and Create Prioritized Issues
+        // Step 6: Merge Results and Create Prioritized Issues
         console.log('[AIService] Merging and prioritizing results...');
         
         // Extract and prioritize issues from paragraphs
