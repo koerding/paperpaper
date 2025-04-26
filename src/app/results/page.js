@@ -1,9 +1,11 @@
+// File Path: src/app/results/page.js
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useAppContext } from '@/context/AppContext'
-import ResultsDisplay from '@/components/ResultsDisplay'
+// Using relative paths
+import { useAppContext } from '../context/AppContext.jsx'
+import ResultsDisplay from '../../components/ResultsDisplay.jsx'
 import Link from 'next/link'
 
 export default function ResultsPage() {
@@ -20,29 +22,36 @@ export default function ResultsPage() {
       if (sub) {
         setSubmission(sub)
       } else {
-        setError('Submission not found')
+        setError('Submission not found or history cleared.')
       }
       setLoading(false)
+    } else {
+        setError('No submission ID provided in the URL.');
+        setLoading(false);
     }
-  }, [submissionId, getSubmission])
+  }, [submissionId, getSubmission]) // Removed 'submissions' dependency as getSubmission should suffice
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <span className="sr-only">Loading results...</span>
       </div>
     )
   }
 
   if (error || !submission) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="text-lg font-medium text-destructive">
-          {error || 'Submission not found'}
-        </div>
-        <Link 
+      <div className="flex flex-col items-center justify-center h-64 space-y-4 text-center border rounded-lg p-8">
+        <h3 className="text-lg font-medium text-destructive">
+          {error || 'Could not load submission details.'}
+        </h3>
+         <p className="text-sm text-muted-foreground">
+            Please check the submission ID or go back home.
+         </p>
+        <Link
           href="/"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          className="inline-flex items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           Back to Home
         </Link>
@@ -50,43 +59,73 @@ export default function ResultsPage() {
     )
   }
 
+  // Display submission details and results
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-bold">Analysis Results</h2>
-        <Link 
+        <Link
           href="/"
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          className="inline-flex items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-nowrap"
         >
           New Analysis
         </Link>
       </div>
-      
-      <div className="border rounded-md p-4 bg-muted/20">
-        <div className="grid grid-cols-2 gap-4">
+
+      {/* Submission Info Section */}
+      <div className="border rounded-md p-4 bg-muted/30">
+        <h3 className="text-lg font-semibold mb-3">Submission Details</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-muted-foreground">File Name</p>
-            <p className="font-medium">{submission.fileName}</p>
+            <p className="font-medium break-words">{submission.fileName || 'N/A'}</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Date Submitted</p>
             <p className="font-medium">
-              {new Date(submission.date).toLocaleString()}
+              {submission.date ? new Date(submission.date).toLocaleString() : 'N/A'}
             </p>
           </div>
+           <div>
+            <p className="text-sm text-muted-foreground">Status</p>
+            <p className="font-medium capitalize">{submission.status || 'Unknown'}</p>
+          </div>
+           {submission.fileSize && (
+               <div>
+                 <p className="text-sm text-muted-foreground">File Size</p>
+                 <p className="font-medium">{(submission.fileSize / 1024).toFixed(1)} KB</p>
+               </div>
+           )}
         </div>
       </div>
-      
-      {submission.status === 'processing' ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="text-lg">Analyzing your paper...</p>
-          </div>
+
+        {/* Results Display or Status Indicator */}
+       {submission.status === 'processing' && (
+        <div className="flex flex-col justify-center items-center h-64 border rounded-lg p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg font-medium">Analyzing your paper...</p>
+           <p className="text-sm text-muted-foreground">This might take a moment.</p>
         </div>
-      ) : (
-        <ResultsDisplay results={submission.results} />
+       )}
+
+      {submission.status === 'error' && (
+          <div className="border rounded-lg p-6 bg-destructive/10 text-destructive">
+              <h3 className="text-lg font-semibold mb-2">Analysis Error</h3>
+              <p>{submission.results?.error || 'An unknown error occurred during analysis.'}</p>
+          </div>
       )}
+
+      {submission.status === 'completed' && submission.results && (
+         <ResultsDisplay results={submission.results} />
+      )}
+
+       {submission.status === 'completed' && !submission.results && (
+           <div className="border rounded-lg p-6 bg-yellow-100 text-yellow-800">
+              <h3 className="text-lg font-semibold mb-2">Analysis Incomplete</h3>
+              <p>The analysis process completed, but no results were found for this submission.</p>
+           </div>
+       )}
+
     </div>
   )
 }
