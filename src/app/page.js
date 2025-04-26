@@ -1,9 +1,11 @@
+// File Path: src/app/page.js
 'use client'
 
 import { useState } from 'react'
-import FileUploader from '@/components/FileUploader'
-import HistoryDisplay from '@/components/HistoryDisplay'
-import { useAppContext } from '@/context/AppContext'
+// Ensure .jsx extension is present for component imports
+import FileUploader from '@/components/FileUploader.jsx'
+import HistoryDisplay from '@/components/HistoryDisplay.jsx'
+import { useAppContext } from '@/context/AppContext.jsx' // Also added .jsx here for consistency
 import { useRouter } from 'next/navigation'
 
 export default function Home() {
@@ -13,7 +15,8 @@ export default function Home() {
     setError,
     addSubmission,
     updateSubmissionResults,
-    setIsProcessing // Added setIsProcessing from context
+    setIsProcessing,
+    getSubmission // Added getSubmission to update status correctly on error
   } = useAppContext()
 
   const router = useRouter()
@@ -82,7 +85,9 @@ export default function Home() {
 
       // Update submission with results (ensure updateSubmissionResults exists and works)
       if (typeof updateSubmissionResults === 'function') {
-         updateSubmissionResults(submissionId, results);
+         // Ensure results is an object before merging
+         const finalResults = typeof results === 'object' && results !== null ? results : {};
+         updateSubmissionResults(submissionId, { ...finalResults, status: 'completed' }); // Explicitly set status to completed
          console.log('[Home Page] Updated submission in context with results.');
       } else {
          console.error('[Home Page] updateSubmissionResults is not a function in context!');
@@ -98,8 +103,14 @@ export default function Home() {
       console.error('[Home Page] Error processing file submission:', err);
       setError(err.message || 'An unexpected error occurred during processing.');
        // Optionally update submission status to 'error' if submissionId exists
-       if (submissionId && typeof updateSubmissionResults === 'function') {
-           updateSubmissionResults(submissionId, { error: err.message || 'Processing failed' }); // Update with error info
+       if (submissionId && typeof updateSubmissionResults === 'function' && typeof getSubmission === 'function') {
+           const currentSubmission = getSubmission(submissionId); // Use getSubmission if available
+           // Ensure results object exists before trying to update, and set status to error
+           const updatedResults = currentSubmission?.results ? { ...currentSubmission.results, error: err.message || 'Processing failed', status: 'error' } : { error: err.message || 'Processing failed', status: 'error' };
+           updateSubmissionResults(submissionId, updatedResults);
+           console.log('[Home Page] Updated submission in context with error status.');
+       } else {
+           console.error('[Home Page] Could not update submission status to error; updateSubmissionResults or getSubmission missing from context?');
        }
     } finally {
        // Ensure processing state is always reset
