@@ -3,33 +3,42 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-// Using relative paths
-import { useAppContext } from '../context/AppContext.jsx'
-import ResultsDisplay from '../../components/ResultsDisplay.jsx'
+// Corrected relative path: ../../ goes up from 'results' to 'app', then 'src'
+import { useAppContext } from '../../context/AppContext.jsx'
+import ResultsDisplay from '../../components/ResultsDisplay.jsx' // This relative path looks correct
 import Link from 'next/link'
 
 export default function ResultsPage() {
   const searchParams = useSearchParams()
   const submissionId = searchParams.get('id')
-  const { getSubmission } = useAppContext()
+  // Ensure getSubmission is destructured correctly
+  const { getSubmission, submissions } = useAppContext() // Also get submissions if needed for useEffect dependency
   const [submission, setSubmission] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    console.log('[ResultsPage] useEffect triggered. ID:', submissionId);
+    setLoading(true); // Set loading true at the start
+    setError(null); // Clear previous errors
+
     if (submissionId) {
-      const sub = getSubmission(submissionId)
+      console.log('[ResultsPage] Attempting to get submission for ID:', submissionId);
+      const sub = getSubmission(submissionId);
       if (sub) {
-        setSubmission(sub)
+        console.log('[ResultsPage] Submission found:', sub);
+        setSubmission(sub);
       } else {
-        setError('Submission not found or history cleared.')
+        console.warn('[ResultsPage] Submission not found for ID:', submissionId);
+        setError('Submission not found or history cleared.');
       }
-      setLoading(false)
     } else {
-        setError('No submission ID provided in the URL.');
-        setLoading(false);
+      console.warn('[ResultsPage] No submission ID found in URL.');
+      setError('No submission ID provided in the URL.');
     }
-  }, [submissionId, getSubmission]) // Removed 'submissions' dependency as getSubmission should suffice
+    setLoading(false); // Set loading false after processing
+  // Rerun effect if the submissionId changes OR if the list of submissions changes (e.g., after initial load)
+  }, [submissionId, getSubmission, submissions]);
 
   if (loading) {
     return (
@@ -37,7 +46,7 @@ export default function ResultsPage() {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         <span className="sr-only">Loading results...</span>
       </div>
-    )
+    );
   }
 
   if (error || !submission) {
@@ -56,7 +65,7 @@ export default function ResultsPage() {
           Back to Home
         </Link>
       </div>
-    )
+    );
   }
 
   // Display submission details and results
@@ -111,6 +120,7 @@ export default function ResultsPage() {
       {submission.status === 'error' && (
           <div className="border rounded-lg p-6 bg-destructive/10 text-destructive">
               <h3 className="text-lg font-semibold mb-2">Analysis Error</h3>
+              {/* Ensure results and results.error exist before accessing */}
               <p>{submission.results?.error || 'An unknown error occurred during analysis.'}</p>
           </div>
       )}
