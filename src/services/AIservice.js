@@ -21,6 +21,34 @@ try {
     paperRules = { rules: [] }; // Use empty rules as fallback? Decide strategy.
 }
 
+// DEBUG HELPER: Write content to debug file
+const writeDebugFile = async (prefix, content) => {
+    try {
+        // Create debug directory if it doesn't exist
+        const debugDir = path.join(process.cwd(), 'debug_logs');
+        if (!fs.existsSync(debugDir)) {
+            fs.mkdirSync(debugDir, { recursive: true });
+        }
+        
+        // Write to timestamped debug file
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = path.join(debugDir, `${prefix}-${timestamp}.json`);
+        
+        // Format content based on type
+        let formattedContent = content;
+        if (typeof content === 'object') {
+            formattedContent = JSON.stringify(content, null, 2);
+        }
+        
+        fs.writeFileSync(filename, formattedContent);
+        console.log(`[AIService Debug] Wrote ${prefix} to ${filename}`);
+        return filename;
+    } catch (err) {
+        console.error(`[AIService Debug] Failed to write debug file for ${prefix}:`, err);
+        return null;
+    }
+};
+
 // Helper Function to create prompts dynamically using rules.json
 function createParagraphAnalysisPrompt(sectionChunkText, rules) {
     // Extract relevant paragraph-level rules (e.g., Rule 3B, 4B)
@@ -141,6 +169,9 @@ export async function analyzeDocumentStructure(document, rawText) {
     console.log('[AIService] >>>>>>>>>> Starting REAL analyzeDocumentStructure...');
     const serviceStartTime = Date.now();
     try {
+        // ENHANCED DEBUGGING - Save input text
+        await writeDebugFile('00-input-raw-text', rawText);
+        
         if (!paperRules) {
              throw new Error("Analysis rules could not be loaded.");
         }
@@ -152,15 +183,19 @@ export async function analyzeDocumentStructure(document, rawText) {
             if (!rawText) throw new Error("Analysis requires either document structure or raw text.");
             console.log('[AIService] Obtaining base document structure via ProcessingService...');
             structuredDoc = await parseStructure(rawText);
+            // DEBUG - Save processed structure
+            await writeDebugFile('01-parsed-structure', structuredDoc);
             console.log('[AIService] Base structure obtained.');
         } else {
             console.log('[AIService] Using provided pre-parsed document structure.');
+            await writeDebugFile('01-provided-structure', structuredDoc);
         }
 
         if (!structuredDoc || typeof structuredDoc !== 'object' || structuredDoc === null) {
             throw new Error("Failed to obtain valid document structure.");
         }
         console.log(`[AIService] Base structure ready. Title: ${structuredDoc.title?.substring(0, 50)}... Sections: ${structuredDoc.sections?.length || 0}`);
+        console.log(`[AIService DEBUG] Full Document Structure: ${JSON.stringify(structuredDoc, null, 2)}`);
 
         // Step 2: Initialize OpenAI Client
         if (!process.env.OPENAI_API_KEY) {
@@ -184,9 +219,15 @@ export async function analyzeDocumentStructure(document, rawText) {
                   continue;
              }
 
+             // DEBUG - Write section text chunk
+             await writeDebugFile(`02-section-text-${section.name || 'unnamed'}`, sectionTextChunk);
+
              // TODO: Implement proper chunking if sectionTextChunk exceeds token limits
 
              const paragraphPromptMessages = createParagraphAnalysisPrompt(sectionTextChunk, paperRules);
+             // DEBUG - Write prompt
+             await writeDebugFile(`03-paragraph-prompt-${section.name || 'unnamed'}`, paragraphPromptMessages);
+             
              try {
                  const response = await openai.chat.completions.create({
                      model: model,
@@ -196,6 +237,10 @@ export async function analyzeDocumentStructure(document, rawText) {
                  });
                  const resultText = response.choices[0]?.message?.content;
                  console.log(`[AIService] Raw paragraph analysis response for section "${section.name}":`, resultText?.substring(0,100) + '...');
+                 
+                 // DEBUG - Write AI response
+                 await writeDebugFile(`04-paragraph-response-${section.name || 'unnamed'}`, resultText);
+                 
                  const sectionResult = JSON.parse(resultText);
                  // TODO: Add validation for sectionResult structure
                  analyzedSections.push({
@@ -212,6 +257,9 @@ export async function analyzeDocumentStructure(document, rawText) {
         console.log('[AIService] Detailed paragraph analysis complete.');
         // Structure containing results from paragraph analysis calls
         const paragraphAnalysisResults = { sections: analyzedSections };
+        
+        // DEBUG - Write paragraph analysis results
+        await writeDebugFile('05-combined-paragraph-analysis', paragraphAnalysisResults);
 
         // Step 4: Perform Document-Level Analysis
         console.log('[AIService] Starting document-level analysis...');
@@ -221,6 +269,10 @@ export async function analyzeDocumentStructure(document, rawText) {
             paragraphAnalysisResults, // Pass paragraph results for context
             paperRules
         );
+        
+        // DEBUG - Write document prompt
+        await writeDebugFile('06-document-level-prompt', documentPromptMessages);
+        
         let documentAnalysis = {}; // Default empty object
         try {
             const response = await openai.chat.completions.create({
@@ -231,6 +283,10 @@ export async function analyzeDocumentStructure(document, rawText) {
             });
              const resultText = response.choices[0]?.message?.content;
              console.log(`[AIService] Raw document analysis response:`, resultText?.substring(0,100) + '...');
+             
+             // DEBUG - Write document response
+             await writeDebugFile('07-document-level-response', resultText);
+             
             documentAnalysis = JSON.parse(resultText);
             // TODO: Validate documentAnalysis structure
         } catch (error) {
@@ -260,6 +316,8 @@ export async function analyzeDocumentStructure(document, rawText) {
         // Recalculate statistics based on actual issues found
         finalResults.statistics = calculateStatistics(finalResults);
 
+        // DEBUG - Write final merged results
+        await writeDebugFile('08-final-merged-results', finalResults);
 
         const serviceEndTime = Date.now();
         console.log(`[AIService] <<<<<<<<<< analyzeDocumentStructure finished. Duration: ${serviceEndTime - serviceStartTime}ms`);
