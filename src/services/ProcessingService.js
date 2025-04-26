@@ -1,11 +1,17 @@
 // File Path: src/services/ProcessingService.js
 import mammoth from 'mammoth';
 import { default as OpenAI } from 'openai';
-import fs from 'fs';
-import path from 'path';
 
 // Function to detect if running in browser
 const isBrowser = typeof window !== 'undefined';
+
+// Only import fs and path in server context
+let fs;
+let path;
+if (!isBrowser) {
+  fs = require('fs');
+  path = require('path');
+}
 
 // DEBUG HELPER: Write content to debug file
 const writeDebugFile = async (prefix, content) => {
@@ -107,8 +113,10 @@ export function validateDocumentSize(text, maxChars) {
 export const extractDocumentStructure = async (text) => {
   console.log('[ProcessingService] Attempting to extract document structure (AI/Fallback)...');
   
-  // DEBUG - Save input text
-  await writeDebugFile('parsing-input-text', text);
+  // DEBUG - Save input text (server-side only)
+  if (!isBrowser) {
+    await writeDebugFile('parsing-input-text', text);
+  }
   
   const fallbackParse = () => {
     console.log('[ProcessingService] Using fallback parsing for document structure.');
@@ -124,8 +132,8 @@ export const extractDocumentStructure = async (text) => {
     
     if (lines.length === 0) return { title: 'Untitled (Empty)', abstract: '', sections: [] };
     
-    // Extract title - usually the first line
-    const title = lines[0] || 'Untitled Document';
+    // Extract title - usually the first line - remove any markdown formatting
+    const title = lines[0].replace(/\*\*/g, '').trim() || 'Untitled Document';
     console.log(`[ProcessingService] Extracted title: ${title}`);
     
     // Find abstract
@@ -133,7 +141,7 @@ export const extractDocumentStructure = async (text) => {
     const abstractIndex = lines.findIndex(line =>
       line.toLowerCase().trim() === 'abstract' || 
       line.toLowerCase().trim() === 'abstract:' || 
-      line.toLowerCase().startsWith('abstract:')
+      line.toLowerCase().includes('abstract:')
     );
     
     console.log(`[ProcessingService] Abstract line index: ${abstractIndex}`);
@@ -232,8 +240,10 @@ export const extractDocumentStructure = async (text) => {
       sections: sections
     };
     
-    // DEBUG - Save fallback parsed structure
-    writeDebugFile('fallback-parsed-structure', result);
+    // DEBUG - Save fallback parsed structure (server-side only)
+    if (!isBrowser) {
+      writeDebugFile('fallback-parsed-structure', result);
+    }
     
     return result;
   };
@@ -295,8 +305,10 @@ Return ONLY a JSON object with this structure:
 }
 `;
 
-    // DEBUG - Save AI prompt
-    await writeDebugFile('ai-parsing-prompt', prompt);
+    // DEBUG - Save AI prompt (server-side only)
+    if (!isBrowser) {
+      await writeDebugFile('ai-parsing-prompt', prompt);
+    }
 
     const response = await openai.chat.completions.create({
       model: process.env.OPENAI_MODEL || 'gpt-4o',
@@ -320,8 +332,10 @@ Return ONLY a JSON object with this structure:
         throw new Error("Invalid response received from AI service.");
     }
     
-    // DEBUG - Save AI response
-    await writeDebugFile('ai-parsing-response', response.choices[0].message.content);
+    // DEBUG - Save AI response (server-side only)
+    if (!isBrowser) {
+      await writeDebugFile('ai-parsing-response', response.choices[0].message.content);
+    }
     
     const parsedStructure = JSON.parse(response.choices[0].message.content);
     
