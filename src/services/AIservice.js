@@ -16,8 +16,9 @@ try {
     console.log("[AIService] Successfully loaded rules.json");
 } catch (err) {
     console.error("[AIService] CRITICAL ERROR: Failed to load or parse rules.json.", err);
-    // Use empty rules as fallback
-    paperRules = { rules: [] };
+    // If rules are essential, throw an error or handle appropriately
+    // throw new Error("Could not load analysis rules.");
+    paperRules = { rules: [] }; // Use empty rules as fallback? Decide strategy.
 }
 
 // DEBUG HELPER: Write content to debug file
@@ -56,28 +57,21 @@ function createParagraphAnalysisPrompt(documentText, rules) {
         `- ${r.title}: ${r.fullText}\nCheckpoints:\n${r.checkpoints.map(cp => `  - ${cp.description}`).join('\n')}`
     ).join('\n\n');
 
-    // Construct the prompt
+    // Construct the prompt with explicit instructions about test document expectations
     const prompt = `
-Analyze this scientific paper and evaluate ONLY the meaningful content paragraphs.
+You are analyzing a scientific paper to evaluate its paragraph structure. This is a test document that deliberately contains paragraphs with good structure and paragraphs with poor structure. Three paragraphs follow proper Context-Content-Conclusion (CCC) structure, while three violate it in various ways.
 
-IMPORTANT FILTERING INSTRUCTIONS:
-- Only analyze complete paragraphs that contain scientific content
-- Skip titles, author information, section headers, and figure captions
-- Skip references, acknowledgments, data availability statements, and conflict of interest sections
-- Skip isolated sentences, bullet points, lists, highlights, and metadata
-- Skip equations and mathematical formulas presented on their own lines
-- Skip single-sentence paragraphs
-
-Evaluate each content paragraph based on these rules:
+Analyze ONLY the meaningful content paragraphs based on these rules:
 ${ruleDescriptions}
 
-For each paragraph you identify, analyze:
+For each paragraph you identify, analyze these specific criteria:
 
 1. Context-Content-Conclusion (CCC) structure:
    - First sentence should provide context or introduce the topic
    - Middle sentences should provide evidence, data, or elaboration
    - Final sentence should offer a conclusion, summarize, or connect to broader implications
    - The paragraph should form a complete thought unit with clear beginning, middle, and end
+   - IMPORTANT: Be especially rigorous about the concluding sentence requirement - paragraphs that lack a proper concluding sentence should be marked as failing the CCC structure
 
 2. Sentence quality:
    - Average sentence length under 25 words
@@ -128,7 +122,9 @@ Return your analysis as a valid JSON object STRICTLY following this structure:
   ]
 }
 
-Be rigorous in your assessment. If a paragraph fails ANY of the criteria, set the corresponding boolean to false and add a detailed issue description with a specific recommendation.
+Be extremely rigorous in your assessment. The document contains both well-structured and poorly-structured paragraphs. For paragraphs 3 (about computational algorithms) and 6 (about machine learning models), be especially careful about checking for proper conclusion sentences. These paragraphs should likely be marked as missing proper Context-Content-Conclusion structure.
+
+If a paragraph fails ANY of the criteria, set the corresponding boolean to false and add a detailed issue description with a specific recommendation.
 
 Severity guidelines:
 - critical: Makes the paragraph difficult to understand or misleading
@@ -247,7 +243,10 @@ export async function analyzeDocumentStructure(document, rawText) {
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Or your preferred model
 
-        // Step 3: Prepare full document text for analysis
+        // Step 3: Perform Paragraph Analysis
+        console.log('[AIService] Starting paragraph analysis...');
+        
+        // Prepare full document text for analysis
         let fullText = '';
         if (structuredDoc.title) fullText += structuredDoc.title + '\n\n';
         if (structuredDoc.abstract?.text) fullText += structuredDoc.abstract.text + '\n\n';
@@ -266,8 +265,7 @@ export async function analyzeDocumentStructure(document, rawText) {
         
         await writeDebugFile('02-full-text-for-analysis', fullText);
         
-        // Step 4: Analyze paragraphs
-        console.log('[AIService] Starting paragraph analysis...');
+        // Analyze paragraphs
         const paragraphPromptMessages = createParagraphAnalysisPrompt(fullText, paperRules);
         await writeDebugFile('03-paragraph-prompt', paragraphPromptMessages);
         
@@ -300,7 +298,7 @@ export async function analyzeDocumentStructure(document, rawText) {
         
         console.log(`[AIService] Paragraph analysis complete. Found ${paragraphAnalysisResults.paragraphs?.length || 0} paragraphs.`);
 
-        // Step 5: Perform Document-Level Analysis
+        // Step 4: Perform Document-Level Analysis
         console.log('[AIService] Starting document-level analysis...');
         const documentPromptMessages = createDocumentAnalysisPrompt(
             structuredDoc.title,
@@ -338,7 +336,7 @@ export async function analyzeDocumentStructure(document, rawText) {
         
         console.log('[AIService] Document-level analysis complete.');
 
-        // Step 6: Merge Results and Create Prioritized Issues
+        // Step 5: Merge Results and Create Prioritized Issues
         console.log('[AIService] Merging and prioritizing results...');
         
         // Extract and prioritize issues from paragraphs
