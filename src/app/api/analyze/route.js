@@ -1,5 +1,7 @@
 // File Path: src/app/api/analyze/route.js
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 // Using relative paths
 import {
   extractTextFromFile,
@@ -13,6 +15,34 @@ import {
   scheduleCleanup
 } from '../../../services/StorageService.js';
 import { MAX_CHAR_COUNT } from '../../../lib/constants.js';
+
+// DEBUG HELPER: Write content to debug file
+const writeDebugFile = async (prefix, content, submissionId) => {
+    try {
+        // Create debug directory if it doesn't exist
+        const debugDir = path.join(process.cwd(), 'debug_logs');
+        if (!fs.existsSync(debugDir)) {
+            fs.mkdirSync(debugDir, { recursive: true });
+        }
+        
+        // Write to timestamped debug file with submission ID
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = path.join(debugDir, `route-${prefix}-${submissionId}-${timestamp}.json`);
+        
+        // Format content based on type
+        let formattedContent = content;
+        if (typeof content === 'object') {
+            formattedContent = JSON.stringify(content, null, 2);
+        }
+        
+        fs.writeFileSync(filename, formattedContent);
+        console.log(`[API Debug] Wrote ${prefix} to ${filename}`);
+        return filename;
+    } catch (err) {
+        console.error(`[API Debug] Failed to write debug file for ${prefix}:`, err);
+        return null;
+    }
+};
 
 /**
  * Analyze document structure
@@ -47,6 +77,8 @@ export async function POST(request) {
     if (formData.has('fileText')) {
       fileText = formData.get('fileText');
       console.log('[API /analyze] Client-extracted text found.');
+      // DEBUG - Save client-extracted text
+      await writeDebugFile('client-extracted-text', fileText, submissionId);
     } else {
       console.log('[API /analyze] No client-extracted text. Processing file on server...');
       const buffer = Buffer.from(await file.arrayBuffer());
@@ -59,6 +91,8 @@ export async function POST(request) {
       console.log('[API /analyze] Attempting server-side text extraction...');
       fileText = await extractTextFromFile(file);
       console.log(`[API /analyze] Server-side text extraction successful. Length: ${fileText?.length || 0}`);
+      // DEBUG - Save server-extracted text
+      await writeDebugFile('server-extracted-text', fileText, submissionId);
     }
 
     console.log('[API /analyze] Validating document character count...');
@@ -82,6 +116,9 @@ export async function POST(request) {
          throw new Error('AI analysis failed to produce valid results.');
      }
     console.log('[API /analyze] AI analysis raw results:', JSON.stringify(analysisResults).substring(0, 200) + '...'); // Log snippet of results
+    
+    // DEBUG - Save analysis results
+    await writeDebugFile('analysis-results', analysisResults, submissionId);
 
 
     // ... (Saving results, generating report, scheduling cleanup - keep existing logs) ...
@@ -117,11 +154,18 @@ export async function POST(request) {
     if (resultsPath) reportLinks.json = `${baseUrl}/api/download?path=${encodeURIComponent(resultsPath)}`;
 
     console.log(`[API /analyze] Preparing successful response for ID: ${submissionId}`);
-    return NextResponse.json({
+    
+    // Create final response
+    const finalResponse = {
       ...analysisResults,
       submissionId,
       reportLinks
-    });
+    };
+    
+    // DEBUG - Save final response
+    await writeDebugFile('final-response', finalResponse, submissionId);
+    
+    return NextResponse.json(finalResponse);
 
   } catch (error) {
     console.error(`[API /analyze] Critical Error for ID ${submissionId}:`, error);
