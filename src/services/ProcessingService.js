@@ -1,3 +1,4 @@
+// File Path: src/services/ProcessingService.js
 // Import mammoth for docx processing
 import mammoth from 'mammoth';
 import { default as OpenAI } from 'openai'; // Keep existing OpenAI import for extractDocumentStructure
@@ -23,6 +24,7 @@ export async function extractTextFromFile(file) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer); // Ensure we have a buffer
 
+    // Use optional chaining for file.name checks
     if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name?.endsWith('.docx')) {
       console.log('[ProcessingService] Extracting text from DOCX using mammoth...');
       const result = await mammoth.extractRawText({ buffer });
@@ -42,7 +44,7 @@ export async function extractTextFromFile(file) {
       console.warn('[ProcessingService] Unsupported file type for text extraction:', file.type, file.name);
       // Return empty string or throw error, depending on desired behavior
       // Throwing error is likely better to signal failure upstream
-      throw new Error(`Unsupported file type for direct text extraction: <span class="math-inline">\{file\.name\} \(</span>{file.type})`);
+      throw new Error(`Unsupported file type for direct text extraction: ${file.name} (${file.type})`);
     }
   } catch (error) {
     console.error('[ProcessingService] Error extracting text from file:', file?.name, error);
@@ -66,9 +68,6 @@ export function validateDocumentSize(text, maxChars) {
     return isValid;
 }
 
-
-// --- Keep the existing extractDocumentStructure function ---
-// --- Ensure it is also exported if used elsewhere, like AIservice ---
 
 /**
  * Extract document structure from text using AI (or fallback)
@@ -130,8 +129,61 @@ export const extractDocumentStructure = async (text) => {
     };
   }
 
-  // --- Rest of the extractDocumentStructure function (AI part) remains the same ---
+  // --- AI structure parsing part ---
   try {
+    // Check if running in browser
     if (typeof window !== 'undefined') {
       console.log('[ProcessingService] Running in browser, cannot use AI for structure parsing here. Falling back.');
       return fallbackParse();
+    }
+
+    // Check for API Key on server
+    if (!process.env.OPENAI_API_KEY) {
+        console.error("[ProcessingService] OpenAI API Key is missing on the server.");
+        throw new Error("OpenAI API Key not configured.");
+    }
+
+    console.log('[ProcessingService] Running on server, attempting AI structure parsing...');
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
+    const textSample = text ? text.substring(0, 8000) : ""; // Handle null/empty text
+
+    if (!textSample) {
+       console.warn("[ProcessingService] Cannot perform AI structure parsing on empty text. Falling back.");
+       return fallbackParse();
+    }
+
+    const response = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You parse scientific papers into structured JSON (title, abstract, sections with paragraphs).'
+        },
+        {
+          role: 'user',
+          content: `Parse the structure (title, abstract, sections, paragraphs) from this text sample into JSON format:\n\n${textSample}`
+        }
+      ],
+      temperature: 0.2,
+      response_format: { type: 'json_object' }
+    });
+
+    console.log('[ProcessingService] AI structure parsing successful.');
+    // Ensure the response content is parsed correctly
+    if (!response.choices[0]?.message?.content) {
+        console.error("[ProcessingService] AI response content is missing.");
+        throw new Error("Invalid response received from AI service.");
+    }
+    const parsedStructure = JSON.parse(response.choices[0].message.content);
+    return parsedStructure;
+
+  } catch (error) {
+    // Catch errors from OpenAI or JSON parsing
+    console.error('[ProcessingService] Error in AI document structure parsing:', error);
+    console.log('[ProcessingService] Falling back to basic parsing due to AI error.');
+    return fallbackParse();
+  }
+};
