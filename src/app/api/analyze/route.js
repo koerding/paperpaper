@@ -1,16 +1,17 @@
+// File Path: src/app/api/analyze/route.js
 import { NextResponse } from 'next/server';
 import {
   extractTextFromFile, // Import the *new* function
   validateDocumentSize
-} from '@/services/ProcessingService'; // Ensure ProcessingService exports this now
-import { analyzeDocumentStructure } from '@/services/AIService';
+} from '@/services/ProcessingService.js'; // Added .js extension
+import { analyzeDocumentStructure } from '@/services/AIService.js'; // Added .js extension
 import {
   saveFile,
   saveResults,
   generateSummaryReport,
   scheduleCleanup
-} from '@/services/StorageService';
-import { MAX_CHAR_COUNT } from '@/lib/constants';
+} from '@/services/StorageService.js'; // Added .js extension
+import { MAX_CHAR_COUNT } from '@/lib/constants.js'; // Added .js extension
 
 /**
  * Analyze document structure
@@ -40,10 +41,10 @@ export async function POST(request) {
 
     // Get the file
     const file = formData.get('file');
-    if (!file) {
-      console.error('[API /analyze] Error: No file provided in form data.');
+    if (!file || !(file instanceof Blob)) { // Check if it's a File/Blob
+      console.error('[API /analyze] Error: No file provided or invalid file in form data.');
       return NextResponse.json(
-        { error: 'No file provided' },
+        { error: 'No valid file provided' },
         { status: 400 }
       );
     }
@@ -74,35 +75,22 @@ export async function POST(request) {
          console.log(`[API /analyze] File saved temporarily to: ${filePath}`);
       } catch (saveError) {
          console.error('[API /analyze] Error saving temporary file:', saveError);
-          // Decide if you want to stop or continue without saving
+         // Decide if you want to stop or continue without saving
          // return NextResponse.json({ error: 'Failed to save uploaded file.' }, { status: 500 });
          // Continuing without filePath, analysis might still work if text extraction succeeds
       }
 
-
-      // Convert buffer back to a File-like object for the extractor if needed,
-      // or modify extractTextFromFile to accept buffer directly.
-      // Let's assume extractTextFromFile can handle the browser-like File object.
-      // Note: Creating a File object on the server might not be standard,
-      // ensure extractTextFromFile handles buffers OR this File object correctly.
-       const serverFileObject = {
-           name: file.name,
-           type: file.type,
-           size: file.size,
-           arrayBuffer: async () => buffer // Provide buffer via async function
-       };
-
-
+      // Pass the original File object directly to the extractor
+      // (assuming extractTextFromFile can handle it)
       console.log('[API /analyze] Attempting server-side text extraction...');
-      // Use the *NEW* extractTextFromFile function
-      fileText = await extractTextFromFile(serverFileObject); // Pass the server-side object
+      fileText = await extractTextFromFile(file); // Pass the File object
       console.log(`[API /analyze] Server-side text extraction successful. Length: ${fileText.length}`);
     }
 
     // Validate document size (character count)
     console.log('[API /analyze] Validating document character count...');
     if (!validateDocumentSize(fileText, MAX_CHAR_COUNT)) {
-      console.error(`[API /analyze] Error: Document text too large (${fileText.length} chars).`);
+      console.error(`[API /analyze] Error: Document text too large (${fileText?.length || 0} chars).`);
       return NextResponse.json(
         { error: `Document is too large. Maximum ${MAX_CHAR_COUNT} characters allowed.` },
         { status: 400 }
@@ -112,12 +100,7 @@ export async function POST(request) {
 
 
     // Analyze document structure using AI
-    // Pass the extracted text to the AI service.
-    // analyzeDocumentStructure might need adjustment if it expects a specific object structure
-    // vs just raw text. Let's assume it primarily needs the text for now.
     console.log('[API /analyze] Calling AI service (analyzeDocumentStructure)...');
-    // Pass the extracted text for analysis. The second argument clarifies it's raw text.
-    // The AI service/ProcessingService might internally parse structure first if needed.
     const analysisResults = await analyzeDocumentStructure(null, fileText); // Pass null for document, focus on rawText
     console.log('[API /analyze] AI analysis completed.');
 
@@ -142,8 +125,13 @@ export async function POST(request) {
     // Generate summary report
      let reportPath = null;
      try {
-         reportPath = await generateSummaryReport(analysisResults, submissionId);
-         console.log(`[API /analyze] Summary report generated at: ${reportPath}`);
+         // Ensure analysisResults is valid before generating report
+         if (typeof analysisResults === 'object' && analysisResults !== null) {
+             reportPath = await generateSummaryReport(analysisResults, submissionId);
+             console.log(`[API /analyze] Summary report generated at: ${reportPath}`);
+         } else {
+              console.warn('[API /analyze] Skipping report generation due to invalid analysis results.');
+         }
      } catch (reportErr) {
          console.error('[API /analyze] Error generating summary report:', reportErr);
          // Continue without report file, but log error
@@ -171,10 +159,6 @@ export async function POST(request) {
      if (resultsPath) {
        reportLinks.json = `${baseUrl}/api/download?path=${encodeURIComponent(resultsPath)}`;
      }
-     // Optionally add link to original file if saved
-     // if (filePath) {
-     //   reportLinks.original = `${baseUrl}/api/download?path=${encodeURIComponent(filePath)}`;
-     // }
 
     console.log('[API /analyze] Preparing successful response...');
     // Return results with report links
