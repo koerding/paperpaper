@@ -1,17 +1,18 @@
 // File Path: src/app/api/analyze/route.js
 import { NextResponse } from 'next/server';
+// Using relative paths
 import {
-  extractTextFromFile, // Import the *new* function
+  extractTextFromFile,
   validateDocumentSize
-} from '@/services/ProcessingService.js'; // Added .js extension
-import { analyzeDocumentStructure } from '@/services/AIService.js'; // Added .js extension
+} from '../../../services/ProcessingService.js';
+import { analyzeDocumentStructure } from '../../../services/AIService.js';
 import {
   saveFile,
   saveResults,
   generateSummaryReport,
   scheduleCleanup
-} from '@/services/StorageService.js'; // Added .js extension
-import { MAX_CHAR_COUNT } from '@/lib/constants.js'; // Added .js extension
+} from '../../../services/StorageService.js';
+import { MAX_CHAR_COUNT } from '../../../lib/constants.js';
 
 /**
  * Analyze document structure
