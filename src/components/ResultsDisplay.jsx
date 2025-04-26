@@ -246,10 +246,16 @@ export default function ResultsDisplay({ results }) {
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <p className="text-sm font-medium">Paragraph {paragraphIndex + 1}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">{paragraph.text_preview}...</p>
-                    <p className="mb-2">{paragraph.summary}</p>
                     
-                    {/* Paragraph Structure Checks - Use evaluations object */}
+                    {/* Full paragraph text instead of preview */}
+                    <div className="mb-3 p-3 bg-muted/10 rounded text-sm">
+                      {paragraph.text}
+                    </div>
+                    
+                    <p className="mb-3 font-medium text-sm">Summary:</p>
+                    <p className="mb-4 pl-3 border-l-2 border-muted">{paragraph.summary}</p>
+                    
+                    {/* Paragraph Structure Checks */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
                       <div className={`text-xs px-2 py-1 rounded ${
                         paragraph.evaluations?.cccStructure 
@@ -272,20 +278,37 @@ export default function ResultsDisplay({ results }) {
                       }`}>
                         Topic Continuity: {paragraph.evaluations?.topicContinuity ? 'Good' : 'Fragmented'}
                       </div>
+                      <div className={`text-xs px-2 py-1 rounded ${
+                        paragraph.evaluations?.terminologyConsistency 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        Terminology: {paragraph.evaluations?.terminologyConsistency ? 'Consistent' : 'Inconsistent'}
+                      </div>
+                      <div className={`text-xs px-2 py-1 rounded ${
+                        paragraph.evaluations?.structuralParallelism 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        Parallelism: {paragraph.evaluations?.structuralParallelism ? 'Good' : 'Needs Work'}
+                      </div>
                     </div>
                     
                     {/* Paragraph Issues */}
                     {paragraph.issues && paragraph.issues.length > 0 && (
-                      <div className="space-y-2">
-                        {paragraph.issues.map((issue, issueIndex) => (
-                          <div key={issueIndex} className="flex items-start space-x-2 text-sm">
-                            {getSeverityIcon(issue.severity)}
-                            <div>
-                              <p>{issue.issue}</p>
-                              <p className="text-xs text-muted-foreground">{issue.recommendation}</p>
+                      <div className="mt-3">
+                        <p className="font-medium text-sm mb-2">Issues:</p>
+                        <div className="space-y-2 pl-3 border-l-2 border-red-200">
+                          {paragraph.issues.map((issue, issueIndex) => (
+                            <div key={issueIndex} className="flex items-start space-x-2 text-sm">
+                              {getSeverityIcon(issue.severity)}
+                              <div>
+                                <p className="font-medium">{issue.issue}</p>
+                                <p className="text-xs text-muted-foreground">{issue.recommendation}</p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
