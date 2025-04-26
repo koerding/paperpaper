@@ -2,10 +2,11 @@
 'use client'
 
 import { useState } from 'react'
-import { useAppContext } from '@/context/AppContext.jsx' // Added .jsx
+// Using relative path
+import { useAppContext } from '../context/AppContext.jsx'
 import { FileText, Clock, CheckCircle, RotateCw, XCircle, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import EmptyState from './EmptyState.jsx' // Added .jsx
+import EmptyState from './EmptyState.jsx' // Keep relative path for sibling component
 
 export default function HistoryDisplay() {
   const { submissions, clearHistory } = useAppContext()
