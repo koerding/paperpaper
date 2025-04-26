@@ -138,7 +138,7 @@ Respond ONLY with the JSON object.`
     }
     
     // Process sections, evaluating paragraphs in batches
-    const batchSize = 5; // Process 5 paragraphs at a time
+    const batchSize = 20; // Process 5 paragraphs at a time
     const evaluatedSections = [];
     
     for (const section of sections) {
