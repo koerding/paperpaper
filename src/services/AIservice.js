@@ -49,45 +49,88 @@ const writeDebugFile = async (prefix, content) => {
     }
 };
 
-// Helper Function to create prompts dynamically using rules.json
-function createParagraphAnalysisPrompt(sectionChunkText, rules) {
-    // Extract relevant paragraph-level rules (e.g., Rule 3B, 4B)
-    const relevantRules = rules?.rules?.filter(r => ['3B', '4B', '2B'].includes(r.id)) || []; // Add relevant rule IDs
-    const ruleDescriptions = relevantRules.map(r => `- ${r.title}: ${r.fullText}\nCheckpoints:\n${r.checkpoints.map(cp => `  - ${cp.description}`).join('\n')}`).join('\n\n');
+// Updated paragraph analysis prompt for AIService.js
+function createParagraphAnalysisPrompt(documentStructure) {
+  const prompt = `
+  Analyze this scientific paper, focusing ONLY on meaningful content paragraphs. 
+  
+  IMPORTANT FILTERING INSTRUCTIONS:
+  - Only analyze complete paragraphs that contain scientific content
+  - Skip titles, author information, section headers, and figure captions
+  - Skip references, acknowledgments, data availability statements, and conflict of interest sections
+  - Skip isolated sentences, bullet points, and metadata
+  - Skip equations and mathematical formulas presented on their own lines
+  
+  For each CONTENT paragraph you identify, evaluate:
+  
+  1. Context-Content-Conclusion (CCC) structure:
+     - First sentence should provide context or introduce the topic
+     - Middle sentences should provide evidence, data, or elaboration
+     - Final sentence should offer a conclusion, summarize, or transition
+  
+  2. Sentence quality:
+     - Average sentence length under 25 words
+     - No sentence exceeding 40 words
+     - Appropriate readability for scientific literature
+  
+  3. Topic continuity:
+     - Single focused topic per paragraph
+     - Logical progression of ideas
+     - No sudden shifts in subject matter
+  
+  4. Terminology consistency:
+     - Same terms used for same concepts
+     - No synonyms that could suggest different meanings
+     - Consistent use of technical terms
+  
+  5. Structural parallelism:
+     - Similar concepts presented with similar grammatical structures
+     - Consistent patterns in lists or series
+     - Similar points follow consistent structural patterns
+  
+  Return your analysis as a valid JSON object with this structure:
+  {
+    "paragraphs": [
+      {
+        "text_preview": "First ~50 chars of paragraph...",
+        "summary": "1-2 sentence summary of paragraph content",
+        "evaluations": {
+          "cccStructure": boolean,
+          "sentenceQuality": boolean,
+          "topicContinuity": boolean,
+          "terminologyConsistency": boolean,
+          "structuralParallelism": boolean
+        },
+        "issues": [
+          {
+            "issue": "Specific description of the issue found",
+            "rule_id": "ID of the rule violated (e.g., 'cccStructure')",
+            "severity": "critical|major|minor",
+            "recommendation": "Specific suggestion for improvement"
+          }
+        ]
+      }
+    ]
+  }
+  
+  Be rigorous in your assessment. If a paragraph fails ANY of the criteria, set the corresponding boolean to false and add a detailed issue description with a specific recommendation.
 
-    // Construct the prompt
-    const prompt = `
-Analyze the following text chunk from a scientific paper section paragraph by paragraph.
-For EACH paragraph, evaluate it based on these rules:
-${ruleDescriptions}
+  Severity guidelines:
+  - critical: Makes the paragraph difficult to understand or misleading
+  - major: Significantly weakens the paragraph's effectiveness
+  - minor: Reduces clarity or precision but doesn't impede understanding
 
-Return your analysis as a valid JSON object STRICTLY following this structure for the entire chunk:
-{
-  "paragraphs": [
-    {
-      "text_preview": "First ~50 chars of paragraph...", // For identification
-      "summary": "1-2 sentence summary of paragraph content",
-      "evaluations": { // Boolean evaluations based on rules
-         "cccStructure": boolean, // Rule 3B
-         "sentenceQuality": boolean, // Rule 2B (length/complexity)
-         "topicContinuity": boolean, // Rule 3B/4A
-         "terminologyConsistency": boolean, // Rule 4B
-         "structuralParallelism": boolean // Rule 4B
-         // Add more boolean flags if needed based on rules.json
-      },
-      "issues": [ // List ONLY issues found
-        {
-          "issue": "Specific description of the issue found based on rules",
-          "rule_id": "ID of the rule violated (e.g., '3B')",
-          "severity": "critical | major | minor", // Assign severity based on rule importance/deviation
-          "recommendation": "Specific suggestion for improvement"
-        }
-      ]
-    }
-    // Include one object for EACH paragraph in the provided text chunk
-  ]
+  Paper structure:
+  
+  Title: ${documentStructure['title']}
+  
+  Abstract: ${documentStructure['abstract']}
+  
+  ${generateSectionsPararaphsText(documentStructure['sections'])}
+  `;
+  
+  return prompt;
 }
-
 Text Chunk to Analyze:
 --- START TEXT CHUNK ---
 ${sectionChunkText}
