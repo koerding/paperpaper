@@ -246,31 +246,31 @@ export default function ResultsDisplay({ results }) {
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <p className="text-sm font-medium">Paragraph {paragraphIndex + 1}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">{paragraph.text}...</p>
+                    <p className="text-sm text-muted-foreground mb-2">{paragraph.text_preview}...</p>
                     <p className="mb-2">{paragraph.summary}</p>
                     
-                    {/* Paragraph Structure Checks */}
+                    {/* Paragraph Structure Checks - Use evaluations object */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
                       <div className={`text-xs px-2 py-1 rounded ${
-                        paragraph.cccStructure 
+                        paragraph.evaluations?.cccStructure 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        C-C-C Structure: {paragraph.cccStructure ? 'Yes' : 'No'}
+                        C-C-C Structure: {paragraph.evaluations?.cccStructure ? 'Yes' : 'No'}
                       </div>
                       <div className={`text-xs px-2 py-1 rounded ${
-                        paragraph.sentenceQuality 
+                        paragraph.evaluations?.sentenceQuality 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        Sentence Quality: {paragraph.sentenceQuality ? 'Good' : 'Needs Work'}
+                        Sentence Quality: {paragraph.evaluations?.sentenceQuality ? 'Good' : 'Needs Work'}
                       </div>
                       <div className={`text-xs px-2 py-1 rounded ${
-                        paragraph.topicContinuity 
+                        paragraph.evaluations?.topicContinuity 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-red-100 text-red-800'
                       }`}>
-                        Topic Continuity: {paragraph.topicContinuity ? 'Good' : 'Fragmented'}
+                        Topic Continuity: {paragraph.evaluations?.topicContinuity ? 'Good' : 'Fragmented'}
                       </div>
                     </div>
                     
