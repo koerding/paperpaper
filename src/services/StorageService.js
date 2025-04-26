@@ -1,16 +1,21 @@
-import fs from 'fs'
-import path from 'path'
-import { promisify } from 'util'
+// File Path: src/services/StorageService.js
+import fs from 'fs';
+import path from 'path';
+import { promisify } from 'util';
 
-// Promisify fs functions
-const writeFileAsync = promisify(fs.writeFile)
-const readFileAsync = promisify(fs.readFile)
-const mkdirAsync = promisify(fs.mkdir)
-const unlinkAsync = promisify(fs.unlink)
-const existsAsync = promisify(fs.exists)
+// Promisify fs functions for cleaner async/await usage
+const writeFileAsync = promisify(fs.writeFile);
+const readFileAsync = promisify(fs.readFile);
+const mkdirAsync = promisify(fs.mkdir);
+const unlinkAsync = promisify(fs.unlink);
+const existsAsync = promisify(fs.exists); // Note: fs.exists is deprecated, use fs.promises.access instead
+const accessAsync = fs.promises ? fs.promises.access : promisify(fs.access); // Prefer fs.promises
+const readdirAsync = fs.promises ? fs.promises.readdir : promisify(fs.readdir); // Prefer fs.promises
 
-// Get temp directory from environment or use default
-const TEMP_DIR = process.env.TEMP_FILE_PATH || './tmp'
+
+// Get temp directory from environment or use default relative to project root
+// Use process.cwd() for better reliability than relative path './tmp'
+const TEMP_DIR = process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp');
 
 /**
  * Initialize storage - ensure temp directory exists
@@ -18,14 +23,26 @@ const TEMP_DIR = process.env.TEMP_FILE_PATH || './tmp'
  */
 export const initStorage = async () => {
   try {
-    if (!(await existsAsync(TEMP_DIR))) {
-      await mkdirAsync(TEMP_DIR, { recursive: true })
-    }
+     // Check existence using fs.promises.access
+     try {
+         await accessAsync(TEMP_DIR, fs.constants.F_OK);
+         console.log(`[StorageService] Temp directory already exists: ${TEMP_DIR}`);
+     } catch (err) {
+          // If error code is ENOENT (Not Found), create the directory
+          if (err.code === 'ENOENT') {
+              console.log(`[StorageService] Temp directory not found, creating: ${TEMP_DIR}`);
+              await mkdirAsync(TEMP_DIR, { recursive: true });
+               console.log(`[StorageService] Temp directory created successfully.`);
+          } else {
+              // Rethrow other errors (e.g., permission issues)
+              throw err;
+          }
+     }
   } catch (error) {
-    console.error('Error initializing storage:', error)
-    throw new Error('Failed to initialize storage')
+    console.error('[StorageService] Error initializing storage:', error);
+    throw new Error('Failed to initialize storage directory');
   }
-}
+};
 
 /**
  * Save a file to temporary storage
@@ -36,21 +53,23 @@ export const initStorage = async () => {
  */
 export const saveFile = async (data, filename, submissionId) => {
   try {
-    await initStorage()
-    
-    // Generate a safe filename
-    const safeFilename = `${submissionId}-${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-    const filePath = path.join(TEMP_DIR, safeFilename)
-    
+    await initStorage(); // Ensure directory exists
+
+    // Generate a safe filename to prevent path traversal and conflicts
+    const safeFilename = `${submissionId}-${Date.now()}-${path.basename(filename).replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = path.join(TEMP_DIR, safeFilename);
+     console.log(`[StorageService] Saving file to path: ${filePath}`);
+
     // Write file
-    await writeFileAsync(filePath, data)
-    
-    return filePath
+    await writeFileAsync(filePath, data);
+     console.log(`[StorageService] File saved successfully.`);
+
+    return filePath;
   } catch (error) {
-    console.error('Error saving file:', error)
-    throw new Error('Failed to save file')
+    console.error('[StorageService] Error saving file:', error);
+    throw new Error('Failed to save file');
   }
-}
+};
 
 /**
  * Save analysis results to a file
@@ -60,20 +79,22 @@ export const saveFile = async (data, filename, submissionId) => {
  */
 export const saveResults = async (results, submissionId) => {
   try {
-    await initStorage()
-    
-    const filename = `results-${submissionId}.json`
-    const filePath = path.join(TEMP_DIR, filename)
-    
-    // Write results as JSON
-    await writeFileAsync(filePath, JSON.stringify(results, null, 2))
-    
-    return filePath
+    await initStorage(); // Ensure directory exists
+
+    const filename = `results-${submissionId}.json`;
+    const filePath = path.join(TEMP_DIR, filename);
+     console.log(`[StorageService] Saving results JSON to path: ${filePath}`);
+
+    // Write results as JSON string
+    await writeFileAsync(filePath, JSON.stringify(results, null, 2)); // Pretty print JSON
+     console.log(`[StorageService] Results JSON saved successfully.`);
+
+    return filePath;
   } catch (error) {
-    console.error('Error saving results:', error)
-    throw new Error('Failed to save results')
+    console.error('[StorageService] Error saving results JSON:', error);
+    throw new Error('Failed to save analysis results');
   }
-}
+};
 
 /**
  * Generate a summary report in Markdown format
@@ -83,103 +104,165 @@ export const saveResults = async (results, submissionId) => {
  */
 export const generateSummaryReport = async (results, submissionId) => {
   try {
-    await initStorage()
-    
-    const filename = `report-${submissionId}.md`
-    const filePath = path.join(TEMP_DIR, filename)
-    
-    // Format report header
-    let report = `# Scientific Paper Structure Assessment\n\n`
-    
-    // Add title
-    report += `## Paper: ${results.title}\n\n`
-    
-    // Add overall assessment
-    report += `## Overall Assessment\n\n`
-    
-    for (const [key, assessment] of Object.entries(results.documentAssessment)) {
-      const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase())
-      report += `- **${formattedKey}**: ${assessment.score}/10 - ${assessment.assessment}\n`
-      if (assessment.recommendation) {
-        report += `  - *Recommendation*: ${assessment.recommendation}\n`
-      }
+    await initStorage(); // Ensure directory exists
+
+    const filename = `report-${submissionId}.md`;
+    const filePath = path.join(TEMP_DIR, filename);
+    console.log(`[StorageService] Generating summary report at path: ${filePath}`);
+
+    // Basic check for results structure
+    if (!results || typeof results !== 'object') {
+        console.error('[StorageService] Cannot generate report: Invalid results object provided.');
+        throw new Error('Invalid results data for report generation.');
     }
-    
-    // Add issue summary
-    report += `\n## Issue Summary\n\n`
-    report += `- Critical Issues: ${results.statistics.critical || 0}\n`
-    report += `- Major Issues: ${results.statistics.major || 0}\n`
-    report += `- Minor Issues: ${results.statistics.minor || 0}\n`
-    
-    // Add top recommendations
-    report += `\n## Top Recommendations\n\n`
-    results.overallRecommendations.forEach((rec, index) => {
-      report += `${index + 1}. ${rec}\n`
-    })
-    
-    // Add major issues section
-    report += `\n## Critical Issues to Address\n\n`
-    results.prioritizedIssues
-      .filter(issue => issue.severity === 'critical')
-      .forEach((issue, index) => {
-        report += `### Issue ${index + 1}: ${issue.issue}\n`
-        report += `- **Location**: ${issue.location}\n`
-        report += `- **Recommendation**: ${issue.recommendation}\n\n`
-      })
-    
-    // Add abstract analysis
-    if (results.abstract) {
-      report += `\n## Abstract Analysis\n\n`
-      report += `"${results.abstract.text}"\n\n`
-      report += `**Summary**: ${results.abstract.summary}\n\n`
-      
-      if (results.abstract.issues && results.abstract.issues.length > 0) {
-        report += `**Issues**:\n\n`
-        results.abstract.issues.forEach((issue, index) => {
-          report += `${index + 1}. **${issue.severity.toUpperCase()}**: ${issue.issue}\n`
-          report += `   - *Recommendation*: ${issue.recommendation}\n\n`
-        })
-      }
-    }
-    
-    // Add section analysis summaries
-    report += `\n## Section Analysis\n\n`
-    results.sections.forEach((section, sIndex) => {
-      report += `### ${section.name}\n\n`
-      
-      section.paragraphs.forEach((paragraph, pIndex) => {
-        report += `#### Paragraph ${pIndex + 1}\n\n`
-        report += `"${paragraph.text}..."\n\n`
-        report += `**Summary**: ${paragraph.summary}\n\n`
-        
-        // Structure assessment
-        report += `**Structure Assessment**:\n`
-        report += `- Context-Content-Conclusion: ${paragraph.cccStructure ? '✓' : '✗'}\n`
-        report += `- Sentence Quality: ${paragraph.sentenceQuality ? '✓' : '✗'}\n`
-        report += `- Topic Continuity: ${paragraph.topicContinuity ? '✓' : '✗'}\n`
-        report += `- Terminology Consistency: ${paragraph.terminologyConsistency ? '✓' : '✗'}\n`
-        report += `- Structural Parallelism: ${paragraph.structuralParallelism ? '✓' : '✗'}\n\n`
-        
-        // Issues
-        if (paragraph.issues && paragraph.issues.length > 0) {
-          report += `**Issues**:\n\n`
-          paragraph.issues.forEach((issue, iIndex) => {
-            report += `${iIndex + 1}. **${issue.severity.toUpperCase()}**: ${issue.issue}\n`
-            report += `   - *Recommendation*: ${issue.recommendation}\n\n`
-          })
+
+
+    // --- Report Generation Logic ---
+    let report = `# Scientific Paper Structure Assessment\n\n`;
+
+    // Add title (handle potential missing title)
+    report += `## Paper: ${results.title || 'Title Not Found'}\n\n`;
+
+    // Add overall assessment (check if documentAssessment exists)
+    report += `## Overall Assessment\n\n`;
+    if (results.documentAssessment && typeof results.documentAssessment === 'object') {
+        for (const [key, assessment] of Object.entries(results.documentAssessment)) {
+             if (assessment && typeof assessment === 'object') { // Check if assessment object is valid
+                 const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase());
+                 report += `- **${formattedKey}**: ${assessment.score ?? 'N/A'}/10 - ${assessment.assessment || 'No assessment'}\n`;
+                 if (assessment.recommendation) {
+                     report += `  - *Recommendation*: ${assessment.recommendation}\n`;
+                 }
+             } else {
+                  report += `- **${key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase())}**: Assessment data missing\n`;
+             }
         }
-      })
-    })
-    
+    } else {
+         report += "Overall assessment data is missing.\n";
+    }
+
+
+    // Add issue summary (check if statistics exist)
+    report += `\n## Issue Summary\n\n`;
+     const stats = results.statistics || {};
+     report += `- Critical Issues: ${stats.critical ?? 0}\n`;
+     report += `- Major Issues: ${stats.major ?? 0}\n`;
+     report += `- Minor Issues: ${stats.minor ?? 0}\n`;
+
+
+    // Add top recommendations (check if overallRecommendations exists and is an array)
+    report += `\n## Top Recommendations\n\n`;
+     if (Array.isArray(results.overallRecommendations)) {
+         results.overallRecommendations.forEach((rec, index) => {
+             report += `${index + 1}. ${rec || 'N/A'}\n`;
+         });
+          if (results.overallRecommendations.length === 0) {
+              report += "No specific overall recommendations provided.\n";
+          }
+     } else {
+         report += "Overall recommendations data is missing or invalid.\n";
+     }
+
+
+    // Add prioritized issues (check if prioritizedIssues exists and is an array)
+     report += `\n## Prioritized Issues List\n\n`;
+     if (Array.isArray(results.prioritizedIssues) && results.prioritizedIssues.length > 0) {
+          results.prioritizedIssues.forEach((issue, index) => {
+              if (issue && typeof issue === 'object') { // Check if issue object is valid
+                  report += `### ${index + 1}. ${issue.issue || 'Issue description missing'}\n`;
+                  report += `- **Severity**: ${issue.severity || 'N/A'}\n`;
+                  report += `- **Location**: ${issue.location || 'N/A'}\n`;
+                  report += `- **Recommendation**: ${issue.recommendation || 'N/A'}\n\n`;
+              }
+          });
+     } else {
+         report += "No prioritized issues listed.\n";
+     }
+
+
+    // Add abstract analysis (check existence and structure)
+    if (results.abstract && typeof results.abstract === 'object') {
+      report += `\n## Abstract Analysis\n\n`;
+      report += `> ${results.abstract.text || 'Abstract text missing.'}\n\n`; // Use blockquote for text
+      report += `**Summary**: ${results.abstract.summary || 'No summary provided.'}\n\n`;
+
+      if (Array.isArray(results.abstract.issues) && results.abstract.issues.length > 0) {
+        report += `**Issues Found**:\n\n`;
+        results.abstract.issues.forEach((issue, index) => {
+           if (issue && typeof issue === 'object') {
+             report += `${index + 1}. **${(issue.severity || 'N/A').toUpperCase()}**: ${issue.issue || 'Issue description missing.'}\n`;
+             report += `   - *Recommendation*: ${issue.recommendation || 'N/A'}\n\n`;
+           }
+        });
+      } else {
+         report += "**Issues Found**: None\n\n";
+      }
+    } else {
+        report += "\n## Abstract Analysis\n\nAbstract data missing or invalid.\n";
+    }
+
+    // Add section analysis summaries (check existence and structure)
+    report += `\n## Section Analysis\n\n`;
+     if (Array.isArray(results.sections) && results.sections.length > 0) {
+         results.sections.forEach((section, sIndex) => {
+             if (section && typeof section === 'object') { // Check section validity
+                 report += `### ${section.name || `Unnamed Section ${sIndex + 1}`}\n\n`;
+                 if (Array.isArray(section.paragraphs) && section.paragraphs.length > 0) {
+                      section.paragraphs.forEach((paragraph, pIndex) => {
+                          if (paragraph && typeof paragraph === 'object') { // Check paragraph validity
+                              report += `#### Paragraph ${pIndex + 1}\n\n`;
+                              report += `> ${paragraph.text ? paragraph.text.substring(0, 100) + '...' : 'Paragraph text missing...'}\n\n`; // Use blockquote
+                              report += `**Summary**: ${paragraph.summary || 'No summary.'}\n\n`;
+
+                              // Structure assessment (check boolean properties)
+                              report += `**Structure Assessment**:\n`;
+                              report += `- Context-Content-Conclusion: ${paragraph.cccStructure ? '✓ Yes' : '✗ No'}\n`;
+                              report += `- Sentence Quality: ${paragraph.sentenceQuality ? '✓ Good' : '✗ Needs Work'}\n`;
+                              report += `- Topic Continuity: ${paragraph.topicContinuity ? '✓ Good' : '✗ Fragmented'}\n`;
+                              report += `- Terminology Consistency: ${paragraph.terminologyConsistency ? '✓ Yes' : '✗ No'}\n`;
+                              report += `- Structural Parallelism: ${paragraph.structuralParallelism ? '✓ Yes' : '✗ No'}\n\n`;
+
+                              // Issues
+                              if (Array.isArray(paragraph.issues) && paragraph.issues.length > 0) {
+                                  report += `**Issues Found**:\n\n`;
+                                  paragraph.issues.forEach((issue, iIndex) => {
+                                       if (issue && typeof issue === 'object') {
+                                           report += `${iIndex + 1}. **${(issue.severity || 'N/A').toUpperCase()}**: ${issue.issue || 'Issue description missing.'}\n`;
+                                           report += `   - *Recommendation*: ${issue.recommendation || 'N/A'}\n\n`;
+                                       }
+                                  });
+                              } else {
+                                   report += "**Issues Found**: None\n\n";
+                              }
+                          } else {
+                               report += `#### Paragraph ${pIndex + 1}\n\nInvalid paragraph data.\n\n`;
+                          }
+                      });
+                 } else {
+                      report += "No paragraphs found or paragraph data is invalid for this section.\n\n";
+                 }
+             } else {
+                  report += `### Unnamed Section ${sIndex + 1}\n\nInvalid section data.\n\n`;
+             }
+         });
+     } else {
+         report += "No sections found or section data is invalid.\n";
+     }
+
+
     // Write report to file
-    await writeFileAsync(filePath, report)
-    
-    return filePath
+    await writeFileAsync(filePath, report);
+    console.log(`[StorageService] Summary report generated successfully.`);
+
+    return filePath;
   } catch (error) {
-    console.error('Error generating report:', error)
-    throw new Error('Failed to generate summary report')
+    console.error('[StorageService] Error generating summary report:', error);
+    // Don't throw here maybe, just return null or log? Depends on requirements.
+    // Throwing is safer to indicate failure.
+    throw new Error('Failed to generate summary report');
   }
-}
+};
+
 
 /**
  * Read a file from storage
@@ -188,12 +271,20 @@ export const generateSummaryReport = async (results, submissionId) => {
  */
 export const readFile = async (filePath) => {
   try {
-    return await readFileAsync(filePath)
+     console.log(`[StorageService] Reading file from path: ${filePath}`);
+    // Basic check to ensure path seems plausible before reading
+     if (!filePath || typeof filePath !== 'string') {
+         throw new Error('Invalid file path provided for reading.');
+     }
+    const data = await readFileAsync(filePath);
+     console.log(`[StorageService] File read successfully. Size: ${data.length}`);
+    return data;
   } catch (error) {
-    console.error('Error reading file:', error)
-    throw new Error('Failed to read file')
+    console.error('[StorageService] Error reading file:', filePath, error);
+    // Throw a new error to avoid exposing raw fs errors potentially
+    throw new Error(`Failed to read file at path: ${path.basename(filePath)}`);
   }
-}
+};
 
 /**
  * Delete a file from storage
@@ -202,37 +293,59 @@ export const readFile = async (filePath) => {
  */
 export const deleteFile = async (filePath) => {
   try {
-    if (await existsAsync(filePath)) {
-      await unlinkAsync(filePath)
-    }
+     console.log(`[StorageService] Attempting to delete file: ${filePath}`);
+     // Use fs.promises.access to check existence first
+      try {
+          await accessAsync(filePath, fs.constants.F_OK);
+          // File exists, proceed with deletion
+          await unlinkAsync(filePath);
+          console.log(`[StorageService] Successfully deleted file: ${filePath}`);
+      } catch (err) {
+           // If file doesn't exist (ENOENT), log it but don't throw an error
+           if (err.code === 'ENOENT') {
+               console.log(`[StorageService] File not found, skipping deletion: ${filePath}`);
+           } else {
+               // For other errors (like permissions), re-throw
+               throw err;
+           }
+      }
   } catch (error) {
-    console.error('Error deleting file:', error)
-    // Don't throw - deleting is not critical
+    // Log deletion errors but don't throw to prevent breaking cleanup process
+    console.error(`[StorageService] Error deleting file: ${filePath}`, error);
   }
-}
+};
 
 /**
- * Clean up files after a certain time
+ * Clean up files associated with a submission ID after a TTL.
  * @param {string} submissionId - ID of submission to clean up
- * @returns {Promise<void>}
+ * @returns {void} - Schedules cleanup, doesn't return Promise
  */
 export const scheduleCleanup = (submissionId) => {
-  // Schedule deletion after 24 hours
+    const CLEANUP_DELAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    console.log(`[StorageService] Scheduling cleanup for submission ID: ${submissionId} in ${CLEANUP_DELAY / 1000 / 3600} hours.`);
+
+  // Schedule deletion
   setTimeout(async () => {
+    console.log(`[StorageService] Starting cleanup for submission ID: ${submissionId}`);
     try {
-      const files = fs.readdirSync(TEMP_DIR)
-      
-      // Find all files matching this submission ID
-      const matchingFiles = files.filter(file => file.includes(submissionId))
-      
+       await initStorage(); // Ensure temp dir exists before reading it
+      const files = await readdirAsync(TEMP_DIR);
+
+      // Find all files matching this submission ID prefix
+      const matchingFiles = files.filter(file => file.startsWith(submissionId));
+       console.log(`[StorageService] Found ${matchingFiles.length} files matching ${submissionId} for cleanup.`);
+
       // Delete each matching file
-      for (const file of matchingFiles) {
-        await deleteFile(path.join(TEMP_DIR, file))
-      }
-      
-      console.log(`Cleaned up files for submission ${submissionId}`)
+      const deletePromises = matchingFiles.map(file =>
+          deleteFile(path.join(TEMP_DIR, file))
+      );
+
+      await Promise.all(deletePromises); // Wait for all deletions
+
+      console.log(`[StorageService] Completed cleanup for submission ${submissionId}`);
     } catch (error) {
-      console.error(`Error cleaning up files for ${submissionId}:`, error)
+      // Log errors during the cleanup process itself
+      console.error(`[StorageService] Error during scheduled cleanup for ${submissionId}:`, error);
     }
-  }, 24 * 60 * 60 * 1000) // 24 hours
-}
+  }, CLEANUP_DELAY);
+};
