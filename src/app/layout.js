@@ -1,6 +1,8 @@
-import './globals.css'
+// File Path: src/app/layout.js
+import '../global.css' // Path confirmed correct by ls -R
 import { Inter } from 'next/font/google'
-import { AppProvider } from '@/context/AppContext'
+// Using relative path
+import { AppProvider } from '../context/AppContext.jsx'
 
 const inter = Inter({ subsets: ['latin'] })
 
