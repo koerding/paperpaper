@@ -2,9 +2,8 @@
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
 import path from 'path';
-import { extractDocumentStructure as parseStructure } from './ProcessingService.js';
 
-// Load rules files
+// Load rules files for reference only (will be included in prompts)
 let paragraphRules = null;
 let documentRules = null;
 
@@ -40,62 +39,76 @@ const writeDebugFile = async (prefix, content) => {
     }
 };
 
-// Create minimalist paragraph analysis prompt
-function createParagraphAnalysisPrompt(documentText) {
-    return [{
-        role: "user",
-        content: `
-Here are the rules for evaluating paragraph structure in scientific papers:
-${JSON.stringify(paragraphRules)}
-
-Be very rigorous and critical in your evaluation. Analyze each paragraph and identify any structural issues.
-Be especially strict about Context-Content-Conclusion structure - the final sentence of a paragraph must 
-provide a clear conclusion or key takeaway.
-
-Return a JSON object with this structure:
-{
-  "paragraphs": [
-    {
-      "text": "The complete paragraph text",
-      "summary": "Brief summary of content",
-      "evaluations": {
-        "cccStructure": boolean,
-        "sentenceQuality": boolean,
-        "topicContinuity": boolean, 
-        "terminologyConsistency": boolean,
-        "structuralParallelism": boolean
-      },
-      "issues": [
-        {
-          "issue": "Description of issue",
-          "rule_id": "ruleId",
-          "severity": "critical | major | minor",
-          "recommendation": "Improvement suggestion"
+// Main analysis function
+export async function analyzeDocumentStructure(document, rawText) {
+    console.log('[AIService] Starting analysis...');
+    const serviceStartTime = Date.now();
+    
+    try {
+        // Save input text for debugging
+        await writeDebugFile('00-input-raw-text', rawText);
+        
+        // Check OpenAI API
+        if (!process.env.OPENAI_API_KEY) {
+            throw new Error("OpenAI API Key not configured");
         }
-      ]
-    }
-  ]
-}
+        
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const model = process.env.OPENAI_MODEL || 'gpt-4o';
+        
+        // Create unified prompt that handles both parsing and analysis
+        const unifiedPrompt = [{
+            role: "system",
+            content: `You are a scientific paper structure analyzer that performs two tasks:
+1. Extract the document structure (title, abstract, sections, paragraphs)
+2. Evaluate the structural quality against scientific writing best practices
+            
+Both tasks must be integrated into a single structured response.`
+        }, {
+            role: "user",
+            content: `I need you to analyze this scientific paper. Complete the analysis in two steps:
 
-TEXT TO ANALYZE:
-${documentText}
+STEP 1: Parse the document structure by extracting:
+- The paper title
+- The abstract
+- All sections with their paragraphs
 
-Respond ONLY with the JSON object.`
-    }];
-}
+STEP 2: Evaluate each paragraph for:
+- Context-Content-Conclusion structure
+- Sentence quality (length under 25 words on average)
+- Topic continuity
+- Terminology consistency
+- Structural parallelism
 
-// Create minimalist document analysis prompt
-function createDocumentAnalysisPrompt(title, abstractText, issuesSummary, criticalCount, majorCount, minorCount) {
-    return [{
-        role: "user",
-        content: `
-Here are the rules for evaluating document structure in scientific papers:
+Then evaluate the document as a whole for:
+- Title quality
+- Abstract completeness
+- Introduction effectiveness
+- Results organization
+- Discussion quality
+- Single message focus
+- Topic organization
+
+Use these evaluation rules for reference:
+${JSON.stringify(paragraphRules)}
 ${JSON.stringify(documentRules)}
 
-Be precise and helpful in your evaluation. Assess the document based on these rules.
+Be rigorous in your evaluation. A paragraph has good CCC structure only if the first sentence provides context, middle sentences provide content, and the last sentence provides a clear conclusion.
 
-Return a JSON object with this structure:
+Return a JSON object with this combined structure:
 {
+  "title": "The extracted paper title",
+  "abstract": {
+    "text": "The complete abstract text",
+    "summary": "Brief summary of abstract content",
+    "issues": [
+      {
+        "issue": "Description of issue",
+        "severity": "critical | major | minor",
+        "recommendation": "Improvement suggestion"
+      }
+    ]
+  },
   "documentAssessment": {
     "titleQuality": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" },
     "abstractCompleteness": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" },
@@ -110,110 +123,97 @@ Return a JSON object with this structure:
     "Second suggestion",
     "Third suggestion"
   ],
-  "statistics": {
-    "critical": ${criticalCount},
-    "major": ${majorCount},
-    "minor": ${minorCount}
-  }
+  "sections": [
+    {
+      "name": "Section name (e.g., Introduction, Methods, etc.)",
+      "paragraphs": [
+        {
+          "text": "Full text of paragraph",
+          "summary": "Brief summary of content",
+          "evaluations": {
+            "cccStructure": boolean,
+            "sentenceQuality": boolean,
+            "topicContinuity": boolean,
+            "terminologyConsistency": boolean,
+            "structuralParallelism": boolean
+          },
+          "issues": [
+            {
+              "issue": "Description of issue",
+              "severity": "critical | major | minor",
+              "recommendation": "Improvement suggestion"
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
 
-Paper Information:
-Title: ${title || 'Not Provided'}
-Abstract: ${abstractText || 'Not Provided'}
-Paragraph Issues: ${criticalCount} critical, ${majorCount} major, ${minorCount} minor
-${issuesSummary ? `Issues Details: ${issuesSummary}` : ''}
+PAPER TEXT:
+${rawText || "No text provided"}
 
 Respond ONLY with the JSON object.`
-    }];
-}
-
-// Main analysis function
-export async function analyzeDocumentStructure(document, rawText) {
-    console.log('[AIService] Starting analysis...');
-    const serviceStartTime = Date.now();
-    
-    try {
-        await writeDebugFile('00-input-raw-text', rawText);
+        }];
         
-        // Get document structure
-        let structuredDoc = document;
-        if (!structuredDoc || !structuredDoc.sections || structuredDoc.sections.length === 0) {
-            if (!rawText) throw new Error("Analysis requires document structure or raw text.");
-            structuredDoc = await parseStructure(rawText);
-            await writeDebugFile('01-parsed-structure', structuredDoc);
-        }
+        // Log the prompt
+        await writeDebugFile('01-unified-prompt', unifiedPrompt);
         
-        // Prepare full text
-        let fullText = '';
-        if (structuredDoc.title) fullText += structuredDoc.title + '\n\n';
-        if (structuredDoc.abstract?.text) fullText += structuredDoc.abstract.text + '\n\n';
-        
-        structuredDoc.sections?.forEach(section => {
-            if (section.name) fullText += section.name + '\n\n';
-            section.paragraphs?.forEach(para => {
-                if (para.text) fullText += para.text + '\n\n';
-            });
+        // Make API call
+        console.log('[AIService] Sending unified document parsing and analysis request...');
+        const response = await openai.chat.completions.create({
+            model: model,
+            messages: unifiedPrompt,
+            response_format: { type: "json_object" },
+            temperature: 0.1
         });
         
-        if (!fullText.trim() && rawText) fullText = rawText;
-        await writeDebugFile('02-full-text', fullText);
+        // Parse response
+        const analysisResult = JSON.parse(response.choices[0]?.message?.content);
+        await writeDebugFile('02-analysis-result', analysisResult);
         
-        // Check OpenAI API
-        if (!process.env.OPENAI_API_KEY) {
-            throw new Error("OpenAI API Key not configured");
-        }
-        
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        const model = process.env.OPENAI_MODEL || 'gpt-4o';
-        
-        // 1. Paragraph analysis
-        console.log('[AIService] Starting paragraph analysis...');
-        const paragraphPrompt = createParagraphAnalysisPrompt(fullText);
-        await writeDebugFile('03-paragraph-prompt', paragraphPrompt);
-        
-        let paragraphResults;
-        try {
-            const response = await openai.chat.completions.create({
-                model: model,
-                messages: paragraphPrompt,
-                response_format: { type: "json_object" },
-                temperature: 0.1
-            });
-            
-            paragraphResults = JSON.parse(response.choices[0]?.message?.content);
-            await writeDebugFile('04-paragraph-results', paragraphResults);
-            
-            if (!paragraphResults.paragraphs) {
-                paragraphResults = { paragraphs: [] };
-            }
-        } catch (error) {
-            console.error('[AIService] Paragraph analysis error:', error);
-            paragraphResults = { paragraphs: [] };
-        }
-        
-        // Process issues
-        const paragraphs = paragraphResults.paragraphs || [];
+        // Calculate issue statistics
+        let criticalCount = 0, majorCount = 0, minorCount = 0;
         const prioritizedIssues = [];
         
-        let criticalCount = 0, majorCount = 0, minorCount = 0;
-        
-        paragraphs.forEach((para, idx) => {
-            if (Array.isArray(para.issues)) {
-                para.issues.forEach(issue => {
-                    if (issue.severity === 'critical') criticalCount++;
-                    if (issue.severity === 'major') majorCount++;
-                    if (issue.severity === 'minor') minorCount++;
-                    
-                    // Create a text preview for issue location (first 50 chars)
-                    const textPreview = para.text ? para.text.substring(0, 50) + '...' : 'unknown';
-                    
-                    prioritizedIssues.push({
-                        ...issue,
-                        location: `Paragraph ${idx + 1} (starting with: "${textPreview}")`
-                    });
+        // Process abstract issues
+        if (analysisResult.abstract && Array.isArray(analysisResult.abstract.issues)) {
+            analysisResult.abstract.issues.forEach(issue => {
+                if (issue.severity === 'critical') criticalCount++;
+                if (issue.severity === 'major') majorCount++;
+                if (issue.severity === 'minor') minorCount++;
+                
+                prioritizedIssues.push({
+                    ...issue,
+                    location: 'Abstract'
                 });
-            }
-        });
+            });
+        }
+        
+        // Process paragraph issues
+        if (Array.isArray(analysisResult.sections)) {
+            analysisResult.sections.forEach(section => {
+                if (Array.isArray(section.paragraphs)) {
+                    section.paragraphs.forEach((para, idx) => {
+                        if (Array.isArray(para.issues)) {
+                            para.issues.forEach(issue => {
+                                if (issue.severity === 'critical') criticalCount++;
+                                if (issue.severity === 'major') majorCount++;
+                                if (issue.severity === 'minor') minorCount++;
+                                
+                                // Create a text preview for issue location
+                                const textPreview = para.text ? para.text.substring(0, 50) + '...' : 'unknown';
+                                
+                                prioritizedIssues.push({
+                                    ...issue,
+                                    location: `${section.name}: Paragraph ${idx + 1} (starting with: "${textPreview}")`
+                                });
+                            });
+                        }
+                    });
+                }
+            });
+        }
         
         // Sort issues by severity
         prioritizedIssues.sort((a, b) => {
@@ -221,61 +221,18 @@ export async function analyzeDocumentStructure(document, rawText) {
             return severityOrder[a.severity] - severityOrder[b.severity];
         });
         
-        // Prepare issues summary
-        const issuesSummary = prioritizedIssues.length > 0 ?
-            prioritizedIssues.slice(0, 5).map(issue => // Only include top 5 issues
-                `${issue.severity.toUpperCase()}: ${issue.issue}`
-            ).join('; ') : 'No issues found.';
-        
-        // 2. Document analysis
-        console.log('[AIService] Starting document analysis...');
-        const documentPrompt = createDocumentAnalysisPrompt(
-            structuredDoc.title,
-            structuredDoc.abstract?.text,
-            issuesSummary,
-            criticalCount,
-            majorCount,
-            minorCount
-        );
-        
-        await writeDebugFile('05-document-prompt', documentPrompt);
-        
-        let documentResults;
-        try {
-            const response = await openai.chat.completions.create({
-                model: model,
-                messages: documentPrompt,
-                response_format: { type: "json_object" },
-                temperature: 0.2
-            });
-            
-            documentResults = JSON.parse(response.choices[0]?.message?.content);
-            await writeDebugFile('06-document-results', documentResults);
-        } catch (error) {
-            console.error('[AIService] Document analysis error:', error);
-            documentResults = { 
-                documentAssessment: {}, 
-                overallRecommendations: [],
-                statistics: { critical: criticalCount, major: majorCount, minor: minorCount }
-            };
-        }
-        
-        // 3. Create final results
+        // Create final results
         const finalResults = {
-            title: structuredDoc.title || "Title Not Found",
-            abstract: {
-                text: structuredDoc.abstract?.text || "",
-                summary: structuredDoc.abstract?.summary || "",
-                issues: []
-            },
-            documentAssessment: documentResults?.documentAssessment || {},
-            overallRecommendations: documentResults?.overallRecommendations || [],
+            title: analysisResult.title || "Title Not Found",
+            abstract: analysisResult.abstract || { text: "", summary: "", issues: [] },
+            documentAssessment: analysisResult.documentAssessment || {},
+            overallRecommendations: analysisResult.overallRecommendations || [],
             statistics: { critical: criticalCount, major: majorCount, minor: minorCount },
             prioritizedIssues: prioritizedIssues,
-            sections: [{ name: "Content", paragraphs: paragraphs }]
+            sections: analysisResult.sections || []
         };
         
-        await writeDebugFile('07-final-results', finalResults);
+        await writeDebugFile('03-final-results', finalResults);
         console.log(`[AIService] Analysis completed in ${Date.now() - serviceStartTime}ms`);
         
         return finalResults;
