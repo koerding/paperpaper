@@ -1,170 +1,157 @@
-// File Path: src/app/page.js
+// File Path: src/app/results/page.js
 'use client'
 
-import { useState } from 'react'
-// Using relative paths instead of alias
-import FileUploader from '../components/FileUploader.jsx'
-import HistoryDisplay from '../components/HistoryDisplay.jsx'
-import { useAppContext } from '../context/AppContext.jsx'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+// ****** THIS IS THE LINE TO CHECK - Ensure it uses ../../ ******
+import { useAppContext } from '../../context/AppContext.jsx'
+import ResultsDisplay from '../../components/ResultsDisplay.jsx' // This relative path should be correct
+import Link from 'next/link'
 
-export default function Home() {
-  const {
-    isProcessing,
-    error,
-    setError,
-    addSubmission,
-    updateSubmissionResults,
-    setIsProcessing,
-    getSubmission // Added getSubmission to update status correctly on error
-  } = useAppContext()
+export default function ResultsPage() {
+  const searchParams = useSearchParams()
+  const submissionId = searchParams.get('id')
+  // Ensure getSubmission is destructured correctly
+  const { getSubmission, submissions } = useAppContext() // Also get submissions if needed for useEffect dependency
+  const [submission, setSubmission] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState('upload')
+  useEffect(() => {
+    console.log('[ResultsPage] useEffect triggered. ID:', submissionId);
+    setLoading(true); // Set loading true at the start
+    setError(null); // Clear previous errors
 
-  // Handle file upload and processing
-  const handleFileSubmit = async (file, fileText) => {
-    console.log('[Home Page] handleFileSubmit triggered for file:', file.name);
-    setError(null); // Clear errors from previous attempts
-    setIsProcessing(true); // Ensure processing state is set
-
-    let submissionId; // Define submissionId here to access in finally block
-
-    try {
-      // Add submission to context immediately
-      submissionId = addSubmission({
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        status: 'processing', // Initial status
-      });
-      console.log('[Home Page] Added submission to context with ID:', submissionId);
-
-      // Prepare form data for API
-      const formData = new FormData();
-      formData.append('file', file);
-
-      if (fileText) {
-        console.log('[Home Page] Appending client-extracted text to FormData.');
-        formData.append('fileText', fileText);
-      } else {
-        console.log('[Home Page] No client-extracted text available, server will extract.');
-      }
-
-      console.log('[Home Page] Sending request to /api/analyze...');
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('[Home Page] Received response from /api/analyze. Status:', response.status);
-
-      if (!response.ok) {
-        let errorData = { message: `HTTP error! status: ${response.status}` };
-        try {
-           // Try to parse JSON error, but handle cases where it's not JSON
-           errorData = await response.json();
-           console.error('[Home Page] API Error Response Body:', errorData);
-        } catch (parseError) {
-           console.error('[Home Page] Could not parse error response as JSON:', parseError);
-           // Attempt to read as text if JSON parsing fails
-           try {
-              const textError = await response.text();
-              console.error('[Home Page] API Error Response Text:', textError);
-              errorData.message = textError || errorData.message;
-           } catch (textErrorErr) {
-              console.error('[Home Page] Could not read error response as text:', textErrorErr);
-           }
+    if (submissionId) {
+      console.log('[ResultsPage] Attempting to get submission for ID:', submissionId);
+      const sub = getSubmission(submissionId);
+      
+      if (sub) {
+        console.log('[ResultsPage] Submission found:', sub);
+        // Debug the submission structure to see what's available
+        console.log('[ResultsPage] Submission status:', sub.status);
+        console.log('[ResultsPage] Submission has results:', !!sub.results);
+        if (sub.results) {
+          console.log('[ResultsPage] Results keys:', Object.keys(sub.results));
         }
-        // Use the detailed message from API if available, otherwise use a generic one
-        throw new Error(errorData.error || errorData.message || 'Error analyzing document');
-      }
-
-      const results = await response.json();
-      console.log('[Home Page] Successfully parsed results from API for submission:', submissionId, results);
-
-      // Update submission with results (ensure updateSubmissionResults exists and works)
-      if (typeof updateSubmissionResults === 'function') {
-         // Ensure results is an object before merging
-         const finalResults = typeof results === 'object' && results !== null ? results : {};
-         
-         // IMPORTANT: Debug log to see what's being received
-         console.log("[Home Page] Results structure from API:", Object.keys(finalResults));
-         
-         // Make sure we're storing the results properly
-         updateSubmissionResults(submissionId, { 
-            status: 'completed',
-            // Store the entire results object itself as the results property
-            results: finalResults 
-         });
-         console.log('[Home Page] Updated submission in context with results.');
+        
+        setSubmission(sub);
       } else {
-         console.error('[Home Page] updateSubmissionResults is not a function in context!');
+        console.warn('[ResultsPage] Submission not found for ID:', submissionId);
+        setError('Submission not found or history cleared.');
       }
-
-      // Navigate to results page
-      console.log('[Home Page] Navigating to results page for submission:', submissionId);
-      router.push(`/results?id=${submissionId}`);
-
-    } catch (err) {
-      // This catches errors from fetch, response parsing, context updates, navigation
-      console.error('[Home Page] Error processing file submission:', err);
-      setError(err.message || 'An unexpected error occurred during processing.');
-       // Optionally update submission status to 'error' if submissionId exists
-       if (submissionId && typeof updateSubmissionResults === 'function' && typeof getSubmission === 'function') {
-           const currentSubmission = getSubmission(submissionId); // Use getSubmission if available
-           // Ensure results object exists before trying to update, and set status to error
-           const updatedResults = currentSubmission?.results ? { ...currentSubmission.results, error: err.message || 'Processing failed', status: 'error' } : { error: err.message || 'Processing failed', status: 'error' };
-           updateSubmissionResults(submissionId, updatedResults);
-           console.log('[Home Page] Updated submission in context with error status.');
-       } else {
-           console.error('[Home Page] Could not update submission status to error; updateSubmissionResults or getSubmission missing from context?');
-       }
-    } finally {
-       // Ensure processing state is always reset
-       console.log('[Home Page] handleFileSubmit finished.');
-       setIsProcessing(false);
+    } else {
+      console.warn('[ResultsPage] No submission ID found in URL.');
+      setError('No submission ID provided in the URL.');
     }
-  };
+    setLoading(false); // Set loading false after processing
+  // Rerun effect if the submissionId changes OR if the list of submissions changes (e.g., after initial load)
+  }, [submissionId, getSubmission, submissions]);
 
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <span className="sr-only">Loading results...</span>
+      </div>
+    );
+  }
 
+  if (error || !submission) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4 text-center border rounded-lg p-8">
+        <h3 className="text-lg font-medium text-destructive">
+          {error || 'Could not load submission details.'}
+        </h3>
+         <p className="text-sm text-muted-foreground">
+            Please check the submission ID or go back home.
+         </p>
+        <Link
+          href="/"
+          className="inline-flex items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        >
+          Back to Home
+        </Link>
+      </div>
+    );
+  }
+
+  // Display submission details and results
   return (
-    <div className="flex flex-col space-y-8">
-      <div className="flex justify-center border-b">
-        <button
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'upload'
-              ? 'border-b-2 border-primary'
-              : 'text-muted-foreground'
-          }`}
-          onClick={() => setActiveTab('upload')}
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h2 className="text-2xl font-bold">Analysis Results</h2>
+        <Link
+          href="/"
+          className="inline-flex items-center justify-center px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 whitespace-nowrap"
         >
-          Upload Paper
-        </button>
-        <button
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'history'
-              ? 'border-b-2 border-primary'
-              : 'text-muted-foreground'
-          }`}
-          onClick={() => setActiveTab('history')}
-        >
-          Submission History
-        </button>
+          New Analysis
+        </Link>
       </div>
 
-      {error && (
-        <div className="bg-destructive/10 text-destructive p-4 rounded-md border border-destructive/30">
-          <p className="font-medium">Error:</p>
-          <p>{error}</p>
+      {/* Submission Info Section */}
+      <div className="border rounded-md p-4 bg-muted/30">
+        <h3 className="text-lg font-semibold mb-3">Submission Details</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">File Name</p>
+            <p className="font-medium break-words">{submission.fileName || 'N/A'}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Date Submitted</p>
+            <p className="font-medium">
+              {submission.date ? new Date(submission.date).toLocaleString() : 'N/A'}
+            </p>
+          </div>
+           <div>
+            <p className="text-sm text-muted-foreground">Status</p>
+            <p className="font-medium capitalize">{submission.status || 'Unknown'}</p>
+          </div>
+           {submission.fileSize && (
+               <div>
+                 <p className="text-sm text-muted-foreground">File Size</p>
+                 <p className="font-medium">{(submission.fileSize / 1024).toFixed(1)} KB</p>
+               </div>
+           )}
+        </div>
+      </div>
+
+      {/* Debug Panel - Optional */}
+      <div className="border rounded-md p-4 bg-blue-50">
+        <h3 className="text-lg font-semibold mb-3">Debug Info</h3>
+        <pre className="text-xs overflow-auto max-h-40">
+          Status: {submission.status}<br />
+          Has Results Object: {String(!!submission.results)}<br />
+          Results Keys: {submission.results ? Object.keys(submission.results).join(', ') : 'N/A'}
+        </pre>
+      </div>
+
+      {/* Results Display or Status Indicator */}
+      {submission.status === 'processing' && (
+        <div className="flex flex-col justify-center items-center h-64 border rounded-lg p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg font-medium">Analyzing your paper...</p>
+           <p className="text-sm text-muted-foreground">This might take a moment.</p>
         </div>
       )}
 
-      {activeTab === 'upload' ? (
-        // Pass the updated handleFileSubmit
-        <FileUploader onFileSubmit={handleFileSubmit} isProcessing={isProcessing} />
-      ) : (
-        <HistoryDisplay />
+      {submission.status === 'error' && (
+          <div className="border rounded-lg p-6 bg-destructive/10 text-destructive">
+              <h3 className="text-lg font-semibold mb-2">Analysis Error</h3>
+              {/* Ensure results and results.error exist before accessing */}
+              <p>{submission.results?.error || 'An unknown error occurred during analysis.'}</p>
+          </div>
+      )}
+
+      {submission.status === 'completed' && submission.results && (
+         <ResultsDisplay results={submission.results} />
+      )}
+
+      {submission.status === 'completed' && !submission.results && (
+          <div className="border rounded-lg p-6 bg-yellow-100 text-yellow-800">
+             <h3 className="text-lg font-semibold mb-2">Analysis Incomplete</h3>
+             <p>The analysis process completed, but no results were found for this submission.</p>
+          </div>
       )}
     </div>
   )
