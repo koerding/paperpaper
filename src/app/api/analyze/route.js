@@ -7,7 +7,7 @@ import {
   extractTextFromFile,
   validateDocumentSize
 } from '../../../services/ProcessingService.js';
-import { analyzeDocumentStructure } from '../../../services/AIService.js'; // Corrected: This is where the AI call happens
+import { analyzeDocumentStructure } from '../../../services/AIService.js';
 import {
   saveFile,
   saveResults,
@@ -55,13 +55,14 @@ export async function POST(request) {
   console.log(`[API /analyze] Generated Submission ID: ${submissionId}`);
 
   try {
-    // ... (Payload size check, form parsing, file retrieval - keep existing logs) ...
+    // Check payload size
     const contentLength = request.headers.get('content-length');
     console.log(`[API /analyze] Content-Length: ${contentLength}`);
     if (contentLength && parseInt(contentLength, 10) > 15 * 1024 * 1024) {
       console.error('[API /analyze] Error: Payload too large.');
       return NextResponse.json({ error: 'Payload too large. Limit is 15MB.' }, { status: 413 });
     }
+    
     console.log('[API /analyze] Parsing form data...');
     const formData = await request.formData();
     const file = formData.get('file');
@@ -74,10 +75,10 @@ export async function POST(request) {
     let fileText;
     let filePath = null;
 
+    // Try to use client-extracted text if available, otherwise extract on server
     if (formData.has('fileText')) {
       fileText = formData.get('fileText');
       console.log('[API /analyze] Client-extracted text found.');
-      // DEBUG - Save client-extracted text
       await writeDebugFile('client-extracted-text', fileText, submissionId);
     } else {
       console.log('[API /analyze] No client-extracted text. Processing file on server...');
@@ -88,13 +89,14 @@ export async function POST(request) {
       } catch (saveError) {
          console.error('[API /analyze] Error saving temporary file:', saveError);
       }
+      
       console.log('[API /analyze] Attempting server-side text extraction...');
       fileText = await extractTextFromFile(file);
       console.log(`[API /analyze] Server-side text extraction successful. Length: ${fileText?.length || 0}`);
-      // DEBUG - Save server-extracted text
       await writeDebugFile('server-extracted-text', fileText, submissionId);
     }
 
+    // Validate document size
     console.log('[API /analyze] Validating document character count...');
     if (!validateDocumentSize(fileText, MAX_CHAR_COUNT)) {
       console.error(`[API /analyze] Error: Document text too large (${fileText?.length || 0} chars).`);
@@ -102,26 +104,24 @@ export async function POST(request) {
     }
     console.log('[API /analyze] Document size validated.');
 
-    // --- Logging around the AI Service Call ---
+    // Call AI service with the extracted text
     console.log(`[API /analyze] >>>>>>>>>> Calling analyzeDocumentStructure in AIService for ID: ${submissionId}...`);
     const analysisStartTime = Date.now();
-    // Ensure fileText is passed correctly
+    // Pass the raw text directly to the AI service - no document structure needed anymore
     const analysisResults = await analyzeDocumentStructure(null, fileText);
     const analysisEndTime = Date.now();
     console.log(`[API /analyze] <<<<<<<<<< AIService analyzeDocumentStructure completed for ID: ${submissionId}. Duration: ${analysisEndTime - analysisStartTime}ms`);
-    // --- End Logging ---
 
     if (typeof analysisResults !== 'object' || analysisResults === null) {
-         console.error('[API /analyze] Error: AI analysis did not return a valid object.');
-         throw new Error('AI analysis failed to produce valid results.');
-     }
+       console.error('[API /analyze] Error: AI analysis did not return a valid object.');
+       throw new Error('AI analysis failed to produce valid results.');
+    }
     console.log('[API /analyze] AI analysis raw results:', JSON.stringify(analysisResults).substring(0, 200) + '...'); // Log snippet of results
     
     // DEBUG - Save analysis results
     await writeDebugFile('analysis-results', analysisResults, submissionId);
 
-
-    // ... (Saving results, generating report, scheduling cleanup - keep existing logs) ...
+    // Save results and generate report
     let resultsPath = null;
     try {
         resultsPath = await saveResults(analysisResults, submissionId);
@@ -129,6 +129,7 @@ export async function POST(request) {
     } catch(saveErr) {
         console.error('[API /analyze] Error saving analysis results JSON:', saveErr);
     }
+    
     let reportPath = null;
     try {
         if (typeof analysisResults === 'object' && analysisResults !== null) {
@@ -140,6 +141,8 @@ export async function POST(request) {
     } catch (reportErr) {
         console.error('[API /analyze] Error generating summary report:', reportErr);
     }
+    
+    // Schedule cleanup of temporary files
     if (filePath || resultsPath || reportPath) {
         scheduleCleanup(submissionId);
         console.log(`[API /analyze] File cleanup scheduled for submission ID: ${submissionId}`);
@@ -147,7 +150,7 @@ export async function POST(request) {
         console.log(`[API /analyze] No files to schedule cleanup for submission ID: ${submissionId}`);
     }
 
-
+    // Generate download links
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host')}`;
     const reportLinks = {};
     if (reportPath) reportLinks.report = `${baseUrl}/api/download?path=${encodeURIComponent(reportPath)}`;
