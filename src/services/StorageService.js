@@ -257,6 +257,7 @@ export const generateSummaryReport = async (results, submissionId) => {
   }
 };
 
+
 /**
  * Read a file from storage
  * @param {string} filePath - Path to file
@@ -273,4 +274,72 @@ export const readFile = async (filePath) => {
      console.log(`[StorageService] File read successfully. Size: ${data.length}`);
     return data;
   } catch (error) {
-    console.error('[StorageService] Error reading file:', fileP
+    console.error('[StorageService] Error reading file:', filePath, error);
+    // Throw a new error to avoid exposing raw fs errors potentially
+    throw new Error(`Failed to read file at path: ${path.basename(filePath)}`);
+  }
+};
+
+/**
+ * Delete a file from storage
+ * @param {string} filePath - Path to file
+ * @returns {Promise<void>}
+ */
+export const deleteFile = async (filePath) => {
+  try {
+     console.log(`[StorageService] Attempting to delete file: ${filePath}`);
+     // Use fs.promises.access to check existence first
+      try {
+          await accessAsync(filePath, fs.constants.F_OK);
+          // File exists, proceed with deletion
+          await unlinkAsync(filePath);
+          console.log(`[StorageService] Successfully deleted file: ${filePath}`);
+      } catch (err) {
+           // If file doesn't exist (ENOENT), log it but don't throw an error
+           if (err.code === 'ENOENT') {
+               console.log(`[StorageService] File not found, skipping deletion: ${filePath}`);
+           } else {
+               // For other errors (like permissions), re-throw
+               throw err;
+           }
+      }
+  } catch (error) {
+    // Log deletion errors but don't throw to prevent breaking cleanup process
+    console.error(`[StorageService] Error deleting file: ${filePath}`, error);
+  }
+};
+
+/**
+ * Clean up files associated with a submission ID after a TTL.
+ * @param {string} submissionId - ID of submission to clean up
+ * @returns {void} - Schedules cleanup, doesn't return Promise
+ */
+export const scheduleCleanup = (submissionId) => {
+    const CLEANUP_DELAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    console.log(`[StorageService] Scheduling cleanup for submission ID: ${submissionId} in ${CLEANUP_DELAY / 1000 / 3600} hours.`);
+
+  // Schedule deletion
+  setTimeout(async () => {
+    console.log(`[StorageService] Starting cleanup for submission ID: ${submissionId}`);
+    try {
+       await initStorage(); // Ensure temp dir exists before reading it
+      const files = await readdirAsync(TEMP_DIR);
+
+      // Find all files matching this submission ID prefix
+      const matchingFiles = files.filter(file => file.startsWith(submissionId));
+       console.log(`[StorageService] Found ${matchingFiles.length} files matching ${submissionId} for cleanup.`);
+
+      // Delete each matching file
+      const deletePromises = matchingFiles.map(file =>
+          deleteFile(path.join(TEMP_DIR, file))
+      );
+
+      await Promise.all(deletePromises); // Wait for all deletions
+
+      console.log(`[StorageService] Completed cleanup for submission ${submissionId}`);
+    } catch (error) {
+      // Log errors during the cleanup process itself
+      console.error(`[StorageService] Error during scheduled cleanup for ${submissionId}:`, error);
+    }
+  }, CLEANUP_DELAY);
+};
