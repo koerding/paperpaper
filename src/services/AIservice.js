@@ -56,7 +56,7 @@ Return a JSON object with this structure:
 {
   "paragraphs": [
     {
-      "text_preview": "First ~50 chars of paragraph...", 
+      "text": "The complete paragraph text",
       "summary": "Brief summary of content",
       "evaluations": {
         "cccStructure": boolean,
@@ -204,9 +204,12 @@ export async function analyzeDocumentStructure(document, rawText) {
                     if (issue.severity === 'major') majorCount++;
                     if (issue.severity === 'minor') minorCount++;
                     
+                    // Create a text preview for issue location (first 50 chars)
+                    const textPreview = para.text ? para.text.substring(0, 50) + '...' : 'unknown';
+                    
                     prioritizedIssues.push({
                         ...issue,
-                        location: `Paragraph ${idx + 1} (starting with: "${para.text_preview || 'unknown'}")`
+                        location: `Paragraph ${idx + 1} (starting with: "${textPreview}")`
                     });
                 });
             }
