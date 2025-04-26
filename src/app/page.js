@@ -81,18 +81,37 @@ export default function Home() {
       }
 
       const results = await response.json();
-      console.log('[Home Page] Successfully parsed results from API for submission:', submissionId, results);
+      console.log('[Home Page] Successfully parsed results from API for submission:', submissionId);
+      console.log('[Home Page] Results structure from API - top-level keys:', Object.keys(results));
 
-      // Update submission with results (ensure updateSubmissionResults exists and works)
+      // CRITICAL FIX: Instead of updating with properties from the results,
+      // we update the submission with a separate results property
       if (typeof updateSubmissionResults === 'function') {
-         // Ensure results is an object before merging
-         const finalResults = typeof results === 'object' && results !== null ? results : {};
-         updateSubmissionResults(submissionId, { ...finalResults, status: 'completed' }); // Explicitly set status to completed
+         // Get the existing submission
+         const currentSubmission = getSubmission(submissionId);
+         
+         // Create an updated version with both status and the full results object
+         const updatedSubmission = {
+            ...currentSubmission,
+            status: 'completed',
+            results: results  // Store the entire results object
+         };
+         
+         console.log('[Home Page] Updating submission with data structure:', 
+           JSON.stringify({
+             id: submissionId,
+             status: 'completed',
+             hasResults: !!results,
+             resultKeys: Object.keys(results)
+           })
+         );
+         
+         // Update the submission in the context
+         updateSubmissionResults(submissionId, updatedSubmission);
          console.log('[Home Page] Updated submission in context with results.');
       } else {
          console.error('[Home Page] updateSubmissionResults is not a function in context!');
       }
-
 
       // Navigate to results page
       console.log('[Home Page] Navigating to results page for submission:', submissionId);
@@ -106,8 +125,12 @@ export default function Home() {
        if (submissionId && typeof updateSubmissionResults === 'function' && typeof getSubmission === 'function') {
            const currentSubmission = getSubmission(submissionId); // Use getSubmission if available
            // Ensure results object exists before trying to update, and set status to error
-           const updatedResults = currentSubmission?.results ? { ...currentSubmission.results, error: err.message || 'Processing failed', status: 'error' } : { error: err.message || 'Processing failed', status: 'error' };
-           updateSubmissionResults(submissionId, updatedResults);
+           const updatedSubmission = {
+             ...currentSubmission,
+             status: 'error',
+             results: { error: err.message || 'Processing failed' }
+           };
+           updateSubmissionResults(submissionId, updatedSubmission);
            console.log('[Home Page] Updated submission in context with error status.');
        } else {
            console.error('[Home Page] Could not update submission status to error; updateSubmissionResults or getSubmission missing from context?');
