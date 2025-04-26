@@ -2,48 +2,31 @@
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
 import path from 'path';
-// Assuming parseStructure uses ProcessingService which might call OpenAI for structure
 import { extractDocumentStructure as parseStructure } from './ProcessingService.js';
-// Import the test document analyzer as a fallback
-import { processTestDocument } from '../utils/TestDocumentAnalyzer.js';
 
 // --- Load Rules ---
 let paperRules = null;
 try {
-    // Construct path relative to the current file's directory
-    const rulesPath = path.join(path.dirname(new URL(import.meta.url).pathname), '../rules.json');
-    console.log(`[AIService] Attempting to load rules from: ${rulesPath}`);
+    const rulesPath = path.join(process.cwd(), 'src', 'rules.json');
     const rulesRaw = fs.readFileSync(rulesPath, 'utf-8');
     paperRules = JSON.parse(rulesRaw);
     console.log("[AIService] Successfully loaded rules.json");
 } catch (err) {
-    console.error("[AIService] CRITICAL ERROR: Failed to load or parse rules.json.", err);
-    // If rules are essential, throw an error or handle appropriately
-    // throw new Error("Could not load analysis rules.");
-    paperRules = { rules: [] }; // Use empty rules as fallback? Decide strategy.
+    console.error("[AIService] CRITICAL ERROR: Failed to load or parse rules.json.");
+    paperRules = { rules: [] };
 }
 
-// DEBUG HELPER: Write content to debug file
+// Debug helper
 const writeDebugFile = async (prefix, content) => {
     try {
-        // Create debug directory if it doesn't exist
         const debugDir = path.join(process.cwd(), 'debug_logs');
-        if (!fs.existsSync(debugDir)) {
-            fs.mkdirSync(debugDir, { recursive: true });
-        }
+        if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir, { recursive: true });
         
-        // Write to timestamped debug file
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = path.join(debugDir, `${prefix}-${timestamp}.json`);
         
-        // Format content based on type
-        let formattedContent = content;
-        if (typeof content === 'object') {
-            formattedContent = JSON.stringify(content, null, 2);
-        }
-        
-        fs.writeFileSync(filename, formattedContent);
-        console.log(`[AIService Debug] Wrote ${prefix} to ${filename}`);
+        fs.writeFileSync(filename, typeof content === 'object' 
+            ? JSON.stringify(content, null, 2) : content);
         return filename;
     } catch (err) {
         console.error(`[AIService Debug] Failed to write debug file for ${prefix}:`, err);
@@ -51,61 +34,51 @@ const writeDebugFile = async (prefix, content) => {
     }
 };
 
-// Helper Function to create prompts dynamically using rules.json
-function createParagraphAnalysisPrompt(documentText, rules) {
-    // Extract relevant paragraph-level rules
-    const relevantRules = rules?.rules?.filter(r => ['3B', '4B', '2B'].includes(r.id)) || [];
-    const ruleDescriptions = relevantRules.map(r => 
-        `- ${r.title}: ${r.fullText}\nCheckpoints:\n${r.checkpoints.map(cp => `  - ${cp.description}`).join('\n')}`
-    ).join('\n\n');
+// Create paragraph analysis prompt using rules
+function createParagraphAnalysisPrompt(documentText) {
+    // Extract relevant rules
+    const rules = paperRules.rules || [];
+    const cccRule = rules.find(r => r.id === '3B') || { 
+        fullText: "The C-C-C scheme defines the structure of the paper on multiple scales. Applying C-C-C at the paragraph scale, the first sentence defines the topic or context, the body hosts the novel content put forth for the reader's consideration, and the last sentence provides the conclusion to be remembered.",
+        checkpoints: []
+    };
+    
+    // Get checkpoints for CCC structure
+    const cccCheckpoints = (cccRule.checkpoints || [])
+        .map(cp => `   - ${cp.description}`)
+        .join('\n');
+    
+    return [{
+        role: "user",
+        content: `
+Analyze the paragraphs in this scientific paper according to structural rules from the "Ten simple rules for structuring papers" guidelines.
 
-    // Construct the prompt with explicit instructions about test document expectations
-    const prompt = `
-You are analyzing a scientific paper to evaluate its paragraph structure. This document may contain both well-structured paragraphs and paragraphs with structural issues.
+Rule 3B: Apply context-content-conclusion structure at the paragraph level
+${cccRule.fullText}
 
-IMPORTANT: Be extremely thorough in your evaluation, especially regarding the Context-Content-Conclusion structure. For CCC structure, the final sentence of a paragraph must provide a clear conclusion or key takeaway of the paragraph.
+Checkpoints for proper C-C-C structure:
+${cccCheckpoints || `
+   - First sentence of each paragraph establishes context or introduces the topic
+   - Middle sentences provide evidence, data, or elaboration of the topic
+   - Final sentence of each paragraph offers a conclusion or key takeaway
+   - Each paragraph forms a complete thought unit with clear beginning, middle, and end`}
 
-Analyze the meaningful content paragraphs based on these rules:
-${ruleDescriptions}
+Additional assessment criteria:
+1. Sentence quality (appropriate length, readability)
+2. Topic continuity (single focused topic per paragraph)
+3. Terminology consistency (same terms for same concepts)
+4. Structural parallelism (similar structure for similar concepts)
 
-For each paragraph you identify, analyze these specific criteria:
+For each paragraph, evaluate all criteria rigorously. Be very strict about the C-C-C structure requirement.
+If a paragraph ends without a proper concluding sentence that provides a key takeaway or summarizes the main point, 
+mark it as failing C-C-C structure (set cccStructure to false).
 
-1. Context-Content-Conclusion (CCC) structure:
-   - First sentence should provide context or introduce the topic
-   - Middle sentences should provide evidence, data, or elaboration
-   - Final sentence should offer a conclusion, summarize, or connect to broader implications
-   - IMPORTANT: Paragraphs lacking a proper concluding sentence should be marked as failing CCC structure
-
-2. Sentence quality:
-   - Average sentence length under 25 words
-   - No sentence exceeding 40 words
-   - Appropriate readability for scientific literature
-   - Logical structures (if-then, cause-effect) not nested more than two levels deep
-
-3. Topic continuity:
-   - Single focused topic per paragraph
-   - Logical progression of ideas
-   - No sudden shifts in subject matter
-   - Paragraph focused on a single idea or step (4-6 sentences ideal)
-
-4. Terminology consistency:
-   - Same terms used for same concepts throughout
-   - No synonyms that could suggest different meanings
-   - Consistent use of technical terms
-   - Important terms defined before use
-
-5. Structural parallelism:
-   - Similar concepts presented with similar grammatical structures
-   - Items in lists or series use parallel grammatical forms
-   - Sequence of similar points follow consistent structural patterns
-   - Consistent patterns when presenting related information
-
-Return your analysis as a valid JSON object STRICTLY following this structure:
+Return a JSON object with this structure:
 {
   "paragraphs": [
     {
       "text_preview": "First ~50 chars of paragraph...", 
-      "summary": "1-2 sentence summary of paragraph content",
+      "summary": "Brief summary of paragraph content",
       "evaluations": {
         "cccStructure": boolean,
         "sentenceQuality": boolean,
@@ -115,8 +88,8 @@ Return your analysis as a valid JSON object STRICTLY following this structure:
       },
       "issues": [
         {
-          "issue": "Specific description of the issue found based on rules",
-          "rule_id": "ID of the rule violated (e.g., 'cccStructure')",
+          "issue": "Description of the issue found",
+          "rule_id": "cccStructure",
           "severity": "critical | major | minor",
           "recommendation": "Specific suggestion for improvement"
         }
@@ -125,73 +98,66 @@ Return your analysis as a valid JSON object STRICTLY following this structure:
   ]
 }
 
-Specifically check for:
-1. Paragraphs that end abruptly without a concluding sentence should be marked as failing the CCC structure
-2. Pay special attention to paragraphs starting with "Scientists developed..." and "Machine learning models were trained..." as they may lack proper conclusions
-3. Be rigorous in your assessment - not every paragraph will follow good structure
-
-If a paragraph fails ANY of the criteria, set the corresponding boolean to false and add a detailed issue description with a specific recommendation.
-
-Severity guidelines:
-- critical: Makes the paragraph difficult to understand or misleading
-- major: Significantly weakens the paragraph's effectiveness
-- minor: Reduces clarity or precision but doesn't impede understanding
-
-Text to Analyze:
---- START TEXT ---
+TEXT TO ANALYZE:
 ${documentText}
---- END TEXT ---
 
-Ensure the output is ONLY the JSON object, without any introductory text or explanations.
-`;
-    return [{ role: "user", content: prompt }];
+Respond ONLY with the JSON object.`
+    }];
 }
 
-function createDocumentAnalysisPrompt(title, abstractText, paragraphAnalysisResults, rules) {
-    // Extract relevant document-level rules
-    const relevantRules = rules?.rules?.filter(r => ['1', '5', '6', '7A', '8A', '8B', '8C'].includes(r.id)) || [];
-    const ruleDescriptions = relevantRules.map(r => 
-        `- ${r.title}: ${r.fullText}\nCheckpoints:\n${r.checkpoints.map(cp => `  - ${cp.description}`).join('\n')}`
-    ).join('\n\n');
-
-    // Count paragraph issues for context
-    let criticalCount = 0;
-    let majorCount = 0;
-    let minorCount = 0;
+// Create document-level analysis prompt
+function createDocumentAnalysisPrompt(title, abstractText, paragraphIssues, criticalCount, majorCount, minorCount) {
+    // Extract relevant rules from rules.json
+    const rules = paperRules.rules || [];
+    const titleRule = rules.find(r => r.id === '1')?.fullText?.substring(0, 150) || 
+        "Title should communicate the central contribution of the paper.";
+    const abstractRule = rules.find(r => r.id === '5')?.fullText?.substring(0, 150) || 
+        "Abstract should tell a complete story with context, gap, approach, results, and significance.";
     
-    paragraphAnalysisResults?.paragraphs?.forEach(p => {
-        p.issues?.forEach(iss => {
-            if (iss.severity === 'critical') criticalCount++;
-            if (iss.severity === 'major') majorCount++;
-            if (iss.severity === 'minor') minorCount++;
-        });
-    });
-    
-    const issueSummary = (criticalCount > 0 || majorCount > 0 || minorCount > 0) 
-        ? `Paragraph analysis found: Critical: ${criticalCount}, Major: ${majorCount}, Minor: ${minorCount} issues.`
-        : "No major paragraph issues detected.";
+    return [{
+        role: "user",
+        content: `
+Evaluate this scientific paper's overall structure using the key rules from "Ten Simple Rules for Structuring Papers":
 
-    const prompt = `
-Analyze the overall structure and flow of a scientific paper based on its title, abstract, and a summary of paragraph-level issues, using the following rules:
-${ruleDescriptions}
+1. Title Quality: 
+${titleRule}...
 
-Evaluate the paper based ONLY on the provided title, abstract, and issue summary.
+2. Abstract Completeness:
+${abstractRule}...
 
-Return your analysis as a valid JSON object STRICTLY following this structure:
+3. Introduction Effectiveness:
+Should highlight the knowledge gap that exists and why it is important.
+
+4. Results Organization:
+Should present results in a logical sequence supporting the central claim.
+
+5. Discussion Quality:
+Should explain how results fill the gap, address limitations, and explain relevance.
+
+6. Single Message Focus:
+Paper should focus on a single central contribution rather than multiple disconnected ones.
+
+7. Topic Organization:
+Topics should be discussed in a consolidated way (avoiding zig-zag).
+
+Based on the provided information about the paper, evaluate these aspects on a scale of 1-10,
+provide a brief assessment for each, and suggest improvements.
+
+Return a JSON object with this structure:
 {
   "documentAssessment": {
-    "titleQuality": { "score": 1-10 rating, "assessment": "Evaluation text based on Rule 1", "recommendation": "Suggestion if needed" },
-    "abstractCompleteness": { "score": 1-10 rating, "assessment": "Evaluation text based on Rule 5", "recommendation": "Suggestion if needed" },
-    "introductionEffectiveness": { "score": 1-10 rating, "assessment": "Evaluation text based on Rule 6", "recommendation": "Suggestion if needed" },
-    "resultsOrganization": { "score": 1-10 rating, "assessment": "Evaluation text based on Rule 7A", "recommendation": "Suggestion if needed" },
-    "discussionQuality": { "score": 1-10 rating, "assessment": "Evaluation text based on Rules 8A, 8B, 8C", "recommendation": "Suggestion if needed" },
-    "singleMessageFocus": { "score": 1-10 rating, "assessment": "Evaluation text based on Rule 1", "recommendation": "Suggestion if needed" },
-    "topicOrganization": { "score": 1-10 rating, "assessment": "Evaluation text based on Rule 4A", "recommendation": "Suggestion if needed" }
+    "titleQuality": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" },
+    "abstractCompleteness": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" },
+    "introductionEffectiveness": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" },
+    "resultsOrganization": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" },
+    "discussionQuality": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" },
+    "singleMessageFocus": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" },
+    "topicOrganization": { "score": 1-10, "assessment": "Brief evaluation", "recommendation": "Suggestion" }
   },
   "overallRecommendations": [
-    "Top suggestion 1",
-    "Top suggestion 2",
-    "Top suggestion 3"
+    "Top priority suggestion",
+    "Second suggestion",
+    "Third suggestion"
   ],
   "statistics": {
     "critical": ${criticalCount},
@@ -203,68 +169,35 @@ Return your analysis as a valid JSON object STRICTLY following this structure:
 Paper Information:
 Title: ${title || 'Not Provided'}
 Abstract: ${abstractText || 'Not Provided'}
-Paragraph Issue Summary: ${issueSummary}
+Paragraph Issues: Found ${criticalCount} critical, ${majorCount} major, ${minorCount} minor issues.
+${paragraphIssues ? `Issue Details: ${paragraphIssues}` : ''}
 
-Provide ONLY the JSON object as output. Base scores and assessments on how well the title/abstract seem to align with the rules provided. Provide actionable recommendations. The statistics should reflect the paragraph-level issues found.
-`;
-    return [{ role: "user", content: prompt }];
+Respond ONLY with the JSON object.`
+    }];
 }
 
-// --- Main Analysis Function ---
+// Main analysis function
 export async function analyzeDocumentStructure(document, rawText) {
-    console.log('[AIService] >>>>>>>>>> Starting document structure analysis...');
+    console.log('[AIService] Starting document structure analysis...');
     const serviceStartTime = Date.now();
+    
     try {
-        // First, check if this is the test document and potentially use the fallback
-        // ENHANCED DEBUGGING - Save input text
         await writeDebugFile('00-input-raw-text', rawText);
         
-        // Check if this is the test document - use key phrases to identify
-        const isTestDocument = rawText && (
-            rawText.includes("This test document contains six paragraphs for evaluating paragraph structure analysis") &&
-            rawText.includes("Understanding climate change impacts requires accurate models") &&
-            rawText.includes("The human brain contains approximately 86 billion neurons")
-        );
-        
-        if (isTestDocument) {
-            console.log('[AIService] Test document detected, will verify AI analysis against expected results');
+        // Verify rules were loaded
+        if (!paperRules || !paperRules.rules || paperRules.rules.length === 0) {
+            console.warn("[AIService] Warning: Rules not properly loaded from rules.json");
         }
         
-        if (!paperRules) {
-             throw new Error("Analysis rules could not be loaded.");
-        }
-
+        // Get document structure
         let structuredDoc = document;
-
-        // Step 1: Get Base Structure
         if (!structuredDoc || !structuredDoc.sections || structuredDoc.sections.length === 0) {
-            if (!rawText) throw new Error("Analysis requires either document structure or raw text.");
-            console.log('[AIService] Obtaining base document structure via ProcessingService...');
+            if (!rawText) throw new Error("Analysis requires document structure or raw text.");
             structuredDoc = await parseStructure(rawText);
             await writeDebugFile('01-parsed-structure', structuredDoc);
-            console.log('[AIService] Base structure obtained.');
-        } else {
-            console.log('[AIService] Using provided pre-parsed document structure.');
-            await writeDebugFile('01-provided-structure', structuredDoc);
-        }
-
-        if (!structuredDoc || typeof structuredDoc !== 'object' || structuredDoc === null) {
-            throw new Error("Failed to obtain valid document structure.");
         }
         
-        console.log(`[AIService] Base structure ready. Title: ${structuredDoc.title?.substring(0, 50)}... Sections: ${structuredDoc.sections?.length || 0}`);
-
-        // Step 2: Initialize OpenAI Client
-        if (!process.env.OPENAI_API_KEY) {
-            throw new Error("OpenAI API Key not configured for AIService.");
-        }
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Or your preferred model
-
-        // Step 3: Perform Paragraph Analysis
-        console.log('[AIService] Starting paragraph analysis...');
-        
-        // Prepare full document text for analysis
+        // Prepare full text for analysis
         let fullText = '';
         if (structuredDoc.title) fullText += structuredDoc.title + '\n\n';
         if (structuredDoc.abstract?.text) fullText += structuredDoc.abstract.text + '\n\n';
@@ -276,15 +209,20 @@ export async function analyzeDocumentStructure(document, rawText) {
             });
         });
         
-        // If no structured text was generated, fall back to raw text
-        if (!fullText.trim() && rawText) {
-            fullText = rawText;
-        }
-        
+        if (!fullText.trim() && rawText) fullText = rawText;
         await writeDebugFile('02-full-text-for-analysis', fullText);
         
+        // Check if OpenAI is configured
+        if (!process.env.OPENAI_API_KEY) {
+            throw new Error("OpenAI API Key not configured");
+        }
+        
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const model = process.env.OPENAI_MODEL || 'gpt-4o';
+        
         // Analyze paragraphs
-        const paragraphPromptMessages = createParagraphAnalysisPrompt(fullText, paperRules);
+        console.log('[AIService] Starting paragraph analysis...');
+        const paragraphPromptMessages = createParagraphAnalysisPrompt(fullText);
         await writeDebugFile('03-paragraph-prompt', paragraphPromptMessages);
         
         let paragraphAnalysisResults;
@@ -293,211 +231,115 @@ export async function analyzeDocumentStructure(document, rawText) {
                 model: model,
                 messages: paragraphPromptMessages,
                 response_format: { type: "json_object" },
+                temperature: 0.1 // Lower temperature for more consistent results
+            });
+            
+            const resultText = response.choices[0]?.message?.content;
+            await writeDebugFile('04-paragraph-response', resultText);
+            
+            paragraphAnalysisResults = JSON.parse(resultText);
+            await writeDebugFile('05-paragraph-analysis', paragraphAnalysisResults);
+            
+            if (!paragraphAnalysisResults.paragraphs) {
+                paragraphAnalysisResults = { paragraphs: [] };
+            }
+        } catch (error) {
+            console.error('[AIService] Error during paragraph analysis:', error);
+            paragraphAnalysisResults = { paragraphs: [] };
+        }
+        
+        // Extract issues and create prioritized list
+        const paragraphs = paragraphAnalysisResults.paragraphs || [];
+        const prioritizedIssues = [];
+        
+        let criticalCount = 0, majorCount = 0, minorCount = 0;
+        
+        paragraphs.forEach((para, pIdx) => {
+            if (Array.isArray(para.issues)) {
+                para.issues.forEach(issue => {
+                    if (issue.severity === 'critical') criticalCount++;
+                    if (issue.severity === 'major') majorCount++;
+                    if (issue.severity === 'minor') minorCount++;
+                    
+                    prioritizedIssues.push({
+                        ...issue,
+                        location: `Paragraph ${pIdx + 1} (starting with: "${para.text_preview || 'unknown'}")`
+                    });
+                });
+            }
+        });
+        
+        // Sort issues by severity
+        prioritizedIssues.sort((a, b) => {
+            const severityOrder = { 'critical': 0, 'major': 1, 'minor': 2 };
+            return severityOrder[a.severity] - severityOrder[b.severity];
+        });
+        
+        await writeDebugFile('06-prioritized-issues', prioritizedIssues);
+        
+        // Create a summary of issues for document analysis
+        const issuesSummary = prioritizedIssues.length > 0 ?
+            prioritizedIssues.map(issue => 
+                `- ${issue.severity.toUpperCase()}: ${issue.issue} (${issue.location})`
+            ).join('\n') : 'No specific issues found.';
+        
+        // Document analysis
+        console.log('[AIService] Starting document-level analysis...');
+        const documentPromptMessages = createDocumentAnalysisPrompt(
+            structuredDoc.title,
+            structuredDoc.abstract?.text,
+            issuesSummary,
+            criticalCount,
+            majorCount,
+            minorCount
+        );
+        
+        await writeDebugFile('07-document-prompt', documentPromptMessages);
+        
+        let documentAnalysis;
+        try {
+            const response = await openai.chat.completions.create({
+                model: model,
+                messages: documentPromptMessages,
+                response_format: { type: "json_object" },
                 temperature: 0.2
             });
             
             const resultText = response.choices[0]?.message?.content;
-            console.log(`[AIService] Raw paragraph analysis response received (${resultText?.length || 0} chars)`);
-            await writeDebugFile('04-paragraph-response', resultText);
+            await writeDebugFile('08-document-response', resultText);
             
-            paragraphAnalysisResults = JSON.parse(resultText);
-            await writeDebugFile('05-paragraph-analysis-parsed', paragraphAnalysisResults);
-            
-            // Validate structure
-            if (!paragraphAnalysisResults.paragraphs || !Array.isArray(paragraphAnalysisResults.paragraphs)) {
-                console.error('[AIService] Invalid paragraph analysis structure. Missing paragraphs array.');
-                paragraphAnalysisResults = { paragraphs: [] };
-            }
-            
-            // Check if this is the test document and if the AI detected the expected issues
-            if (isTestDocument) {
-                // Validate if paragraphs 3 and 6 have been correctly identified with CCC structure issues
-                let hasCorrectIssues = false;
-                
-                // Count actual issues found
-                const issueCount = paragraphAnalysisResults.paragraphs.reduce((count, p) => count + (p.issues?.length || 0), 0);
-                
-                if (issueCount >= 2) {
-                    console.log(`[AIService] AI identified ${issueCount} issues in the test document`);
-                    // Consider issues correctly identified
-                    hasCorrectIssues = true;
-                } else {
-                    console.log(`[AIService] AI only identified ${issueCount} issues in the test document, expected at least 2`);
-                    hasCorrectIssues = false;
-                }
-                
-                // If issues were not correctly identified, use fallback
-                if (!hasCorrectIssues) {
-                    console.log('[AIService] Using test document fallback analysis');
-                    const fallbackResults = processTestDocument(fullText);
-                    
-                    if (fallbackResults) {
-                        // Replace paragraph analysis with fallback results
-                        paragraphAnalysisResults = { paragraphs: fallbackResults.paragraphs };
-                        await writeDebugFile('05b-fallback-paragraph-analysis', paragraphAnalysisResults);
-                    }
-                }
-            }
-            
+            documentAnalysis = JSON.parse(resultText);
+            await writeDebugFile('09-document-analysis', documentAnalysis);
         } catch (error) {
-            console.error(`[AIService] Error during paragraph analysis:`, error);
-            
-            // For test document, use fallback if OpenAI call fails
-            if (isTestDocument) {
-                console.log('[AIService] Using test document fallback analysis after error');
-                const fallbackResults = processTestDocument(fullText);
-                
-                if (fallbackResults) {
-                    paragraphAnalysisResults = { paragraphs: fallbackResults.paragraphs };
-                } else {
-                    paragraphAnalysisResults = { paragraphs: [] };
-                }
-            } else {
-                paragraphAnalysisResults = { paragraphs: [] };
-            }
+            console.error('[AIService] Error during document analysis:', error);
+            documentAnalysis = { 
+                documentAssessment: {}, 
+                overallRecommendations: [],
+                statistics: { critical: criticalCount, major: majorCount, minor: minorCount }
+            };
         }
         
-        console.log(`[AIService] Paragraph analysis complete. Found ${paragraphAnalysisResults.paragraphs?.length || 0} paragraphs.`);
-
-        // Step 4: Perform Document-Level Analysis
-        console.log('[AIService] Starting document-level analysis...');
-        
-        let documentAnalysis;
-        
-        // For test document, potentially use fallback document analysis
-        if (isTestDocument) {
-            const fallbackResults = processTestDocument(fullText);
-            
-            if (fallbackResults && fallbackResults.documentAssessment) {
-                console.log('[AIService] Using test document fallback for document assessment');
-                documentAnalysis = {
-                    documentAssessment: fallbackResults.documentAssessment,
-                    overallRecommendations: fallbackResults.overallRecommendations,
-                    statistics: fallbackResults.statistics
-                };
-                await writeDebugFile('07b-fallback-document-analysis', documentAnalysis);
-            } else {
-                // Proceed with regular document analysis
-                const documentPromptMessages = createDocumentAnalysisPrompt(
-                    structuredDoc.title,
-                    structuredDoc.abstract?.text,
-                    paragraphAnalysisResults,
-                    paperRules
-                );
-                
-                await writeDebugFile('06-document-level-prompt', documentPromptMessages);
-                
-                try {
-                    const response = await openai.chat.completions.create({
-                        model: model,
-                        messages: documentPromptMessages,
-                        response_format: { type: "json_object" },
-                        temperature: 0.3
-                    });
-                    
-                    const resultText = response.choices[0]?.message?.content;
-                    console.log(`[AIService] Raw document analysis response received (${resultText?.length || 0} chars)`);
-                    await writeDebugFile('07-document-level-response', resultText);
-                    
-                    documentAnalysis = JSON.parse(resultText);
-                    await writeDebugFile('08-document-analysis-parsed', documentAnalysis);
-                } catch (error) {
-                    console.error(`[AIService] Error during document-level analysis:`, error);
-                    documentAnalysis = { 
-                        documentAssessment: {}, 
-                        overallRecommendations: [],
-                        statistics: { critical: 0, major: 0, minor: 0 }
-                    };
-                }
-            }
-        } else {
-            // For non-test documents, use regular document analysis
-            const documentPromptMessages = createDocumentAnalysisPrompt(
-                structuredDoc.title,
-                structuredDoc.abstract?.text,
-                paragraphAnalysisResults,
-                paperRules
-            );
-            
-            await writeDebugFile('06-document-level-prompt', documentPromptMessages);
-            
-            try {
-                const response = await openai.chat.completions.create({
-                    model: model,
-                    messages: documentPromptMessages,
-                    response_format: { type: "json_object" },
-                    temperature: 0.3
-                });
-                
-                const resultText = response.choices[0]?.message?.content;
-                console.log(`[AIService] Raw document analysis response received (${resultText?.length || 0} chars)`);
-                await writeDebugFile('07-document-level-response', resultText);
-                
-                documentAnalysis = JSON.parse(resultText);
-                await writeDebugFile('08-document-analysis-parsed', documentAnalysis);
-            } catch (error) {
-                console.error(`[AIService] Error during document-level analysis:`, error);
-                documentAnalysis = { 
-                    documentAssessment: {}, 
-                    overallRecommendations: [],
-                    statistics: { critical: 0, major: 0, minor: 0 }
-                };
-            }
-        }
-        
-        console.log('[AIService] Document-level analysis complete.');
-
-        // Step 5: Merge Results and Create Prioritized Issues
-        console.log('[AIService] Merging and prioritizing results...');
-        
-        // Extract and prioritize issues from paragraphs
-        const prioritizedIssues = createPrioritizedIssues(paragraphAnalysisResults.paragraphs || []);
-        await writeDebugFile('09-prioritized-issues', prioritizedIssues);
-        
-        // Update the statistics to match the actual issues count
-        let criticalCount = 0;
-        let majorCount = 0;
-        let minorCount = 0;
-        
-        prioritizedIssues.forEach(issue => {
-            if (issue.severity === 'critical') criticalCount++;
-            if (issue.severity === 'major') majorCount++;
-            if (issue.severity === 'minor') minorCount++;
-        });
-        
-        // Prepare final results
+        // Final results
         const finalResults = {
             title: structuredDoc.title || "Title Not Found",
             abstract: {
                 text: structuredDoc.abstract?.text || "",
                 summary: structuredDoc.abstract?.summary || "",
-                issues: []  // Abstract issues would be populated if we analyzed the abstract separately
+                issues: []
             },
             documentAssessment: documentAnalysis?.documentAssessment || {},
             overallRecommendations: documentAnalysis?.overallRecommendations || [],
-            statistics: {
-                critical: criticalCount,
-                major: majorCount,
-                minor: minorCount
-            },
+            statistics: { critical: criticalCount, major: majorCount, minor: minorCount },
             prioritizedIssues: prioritizedIssues,
-            sections: [{
-                name: "Content", 
-                paragraphs: paragraphAnalysisResults.paragraphs || []
-            }]
+            sections: [{ name: "Content", paragraphs: paragraphs }]
         };
-
+        
         await writeDebugFile('10-final-results', finalResults);
-
-        const serviceEndTime = Date.now();
-        console.log(`[AIService] <<<<<<<<<< Analysis completed. Duration: ${serviceEndTime - serviceStartTime}ms`);
+        console.log(`[AIService] Analysis completed in ${Date.now() - serviceStartTime}ms`);
         
         return finalResults;
-
     } catch (error) {
-        const serviceEndTime = Date.now();
-        console.error(`[AIService] <<<<<<<<<< Error in analyzeDocumentStructure (Duration: ${serviceEndTime - serviceStartTime}ms):`, error);
-        
+        console.error('[AIService] Error in document analysis:', error);
         return {
             analysisError: `Failed to complete analysis: ${error.message}`,
             title: "Analysis Failed",
@@ -509,29 +351,4 @@ export async function analyzeDocumentStructure(document, rawText) {
             sections: []
         };
     }
-}
-
-// Helper function to create prioritized issues list
-function createPrioritizedIssues(paragraphs) {
-    const allIssues = [];
-    
-    // Collect all issues with location information
-    paragraphs.forEach((para, pIdx) => {
-        if (Array.isArray(para.issues)) {
-            para.issues.forEach(issue => {
-                allIssues.push({
-                    ...issue,
-                    location: `Paragraph ${pIdx + 1} (starting with: "${para.text_preview || 'unknown'}")`
-                });
-            });
-        }
-    });
-    
-    // Sort by severity
-    const sortedIssues = allIssues.sort((a, b) => {
-        const severityOrder = { 'critical': 0, 'major': 1, 'minor': 2 };
-        return severityOrder[a.severity] - severityOrder[b.severity];
-    });
-    
-    return sortedIssues;
 }
