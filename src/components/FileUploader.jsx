@@ -6,7 +6,7 @@ import { useDropzone } from 'react-dropzone'
 import { Cloud, FileText, AlertCircle } from 'lucide-react'
 // Using relative paths for imports from other src subdirectories
 import { useAppContext } from '../context/AppContext.jsx'
-import { extractTextFromFile } from '../services/ProcessingService.js'
+import { extractTextFromFile } from '../services/ProcessingService.client.js'
 
 export default function FileUploader({ onFileSubmit, isProcessing }) {
   const { setIsProcessing, setError } = useAppContext()
