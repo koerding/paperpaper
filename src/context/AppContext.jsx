@@ -72,40 +72,87 @@ export function AppProvider({ children }) {
     }
   }, [submissions]) // Run whenever the submissions array changes
 
-  // --- Rest of the functions (addSubmission, getSubmission, etc.) remain the same ---
-   const addSubmission = (submission) => {
-     console.log("[AppContext] Adding new submission:", submission.fileName);
-     const newSubmission = { ...submission, id: `submission-${Date.now()}`, date: new Date().toISOString(), status: submission.status || 'processing', results: null };
-     setSubmissions((prevSubmissions) => [newSubmission, ...(Array.isArray(prevSubmissions) ? prevSubmissions : [])]);
-     setCurrentSubmission(newSubmission);
-     console.log("[AppContext] New submission added with ID:", newSubmission.id);
-     return newSubmission.id;
-   }
-   const getSubmission = (id) => {
-     console.log("[AppContext] Getting submission by ID:", id);
-     if (!Array.isArray(submissions)) return null;
-     const found = submissions.find((sub) => sub && sub.id === id);
-     console.log(found ? "[AppContext] Submission found." : "[AppContext] Submission not found.");
-     return found || null;
-   }
-   const clearHistory = () => {
-     console.log("[AppContext] Clearing submission history.");
-     setSubmissions([]);
-     setCurrentSubmission(null);
-     // localStorage removal handled by useEffect on submissions change
-   }
-    const updateSubmissionResults = (id, resultsUpdate) => {
-      console.log(`[AppContext] Updating submission ID ${id} with:`, resultsUpdate);
-      const updateData = typeof resultsUpdate === 'object' && resultsUpdate !== null ? resultsUpdate : {};
-      setSubmissions((prevSubmissions) => (Array.isArray(prevSubmissions) ? prevSubmissions : []).map((sub) => (sub && sub.id === id ? { ...sub, ...updateData } : sub)));
-      setCurrentSubmission((prevCurrent) => (prevCurrent && prevCurrent.id === id ? { ...prevCurrent, ...updateData } : prevCurrent));
+  // --- Updated the updateSubmissionResults function ---
+  const addSubmission = (submission) => {
+    console.log("[AppContext] Adding new submission:", submission.fileName);
+    const newSubmission = { ...submission, id: `submission-${Date.now()}`, date: new Date().toISOString(), status: submission.status || 'processing', results: null };
+    setSubmissions((prevSubmissions) => [newSubmission, ...(Array.isArray(prevSubmissions) ? prevSubmissions : [])]);
+    setCurrentSubmission(newSubmission);
+    console.log("[AppContext] New submission added with ID:", newSubmission.id);
+    return newSubmission.id;
+  }
+  
+  const getSubmission = (id) => {
+    console.log("[AppContext] Getting submission by ID:", id);
+    if (!Array.isArray(submissions)) return null;
+    const found = submissions.find((sub) => sub && sub.id === id);
+    console.log(found ? "[AppContext] Submission found." : "[AppContext] Submission not found.");
+    return found || null;
+  }
+  
+  const clearHistory = () => {
+    console.log("[AppContext] Clearing submission history.");
+    setSubmissions([]);
+    setCurrentSubmission(null);
+    // localStorage removal handled by useEffect on submissions change
+  }
+  
+  // Modified updateSubmissionResults function with better debugging
+  const updateSubmissionResults = (id, updateData) => {
+    console.log(`[AppContext] Updating submission ID ${id} with:`, updateData);
+    
+    if (typeof updateData !== 'object' || updateData === null) {
+      console.error("[AppContext] Invalid update data:", updateData);
+      return;
     }
-    const handleSetError = (errorMessage) => {
-        console.log("[AppContext] Setting error state:", errorMessage);
-        setError(errorMessage);
-    };
+    
+    // Create a deep copy to avoid reference issues
+    const update = JSON.parse(JSON.stringify(updateData));
+    
+    setSubmissions((prevSubmissions) => {
+      if (!Array.isArray(prevSubmissions)) {
+        console.error("[AppContext] prevSubmissions is not an array:", prevSubmissions);
+        return [];
+      }
+      
+      return prevSubmissions.map((sub) => {
+        if (sub && sub.id === id) {
+          const updated = { ...sub, ...update };
+          console.log(`[AppContext] Updated submission ${id}:`, updated);
+          return updated;
+        }
+        return sub;
+      });
+    });
+    
+    // Also update currentSubmission if it matches
+    setCurrentSubmission((prevCurrent) => {
+      if (prevCurrent && prevCurrent.id === id) {
+        const updated = { ...prevCurrent, ...update };
+        console.log(`[AppContext] Updated currentSubmission:`, updated);
+        return updated;
+      }
+      return prevCurrent;
+    });
+  }
+  
+  const handleSetError = (errorMessage) => {
+    console.log("[AppContext] Setting error state:", errorMessage);
+    setError(errorMessage);
+  };
 
-  const value = { submissions, currentSubmission, isProcessing, error, setIsProcessing, setError: handleSetError, addSubmission, getSubmission, clearHistory, updateSubmissionResults, }
+  const value = { 
+    submissions, 
+    currentSubmission, 
+    isProcessing, 
+    error, 
+    setIsProcessing, 
+    setError: handleSetError, 
+    addSubmission, 
+    getSubmission, 
+    clearHistory, 
+    updateSubmissionResults 
+  }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
