@@ -113,66 +113,66 @@ export const generateSummaryReport = async (results, submissionId) => {
         throw new Error('Invalid results data for report generation.');
     }
 
-    // Start report generation
+    // --- Report Generation Logic ---
     let report = `# Scientific Paper Structure Assessment\n\n`;
 
-    // Add title
+    // Add title (handle potential missing title)
     report += `## Paper: ${results.title || 'Title Not Found'}\n\n`;
 
-    // Add overall assessment
+    // Add overall assessment (check if documentAssessment exists)
     report += `## Overall Assessment\n\n`;
     if (results.documentAssessment && typeof results.documentAssessment === 'object') {
         for (const [key, assessment] of Object.entries(results.documentAssessment)) {
-            if (assessment && typeof assessment === 'object') {
-                const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase());
-                report += `- **${formattedKey}**: ${assessment.score ?? 'N/A'}/10 - ${assessment.assessment || 'No assessment'}\n`;
-                if (assessment.recommendation) {
-                    report += `  - *Recommendation*: ${assessment.recommendation}\n`;
-                }
-            } else {
-                report += `- **${key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase())}**: Assessment data missing\n`;
-            }
+             if (assessment && typeof assessment === 'object') { // Check if assessment object is valid
+                 const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase());
+                 report += `- **${formattedKey}**: ${assessment.score ?? 'N/A'}/10 - ${assessment.assessment || 'No assessment'}\n`;
+                 if (assessment.recommendation) {
+                     report += `  - *Recommendation*: ${assessment.recommendation}\n`;
+                 }
+             } else {
+                  report += `- **${key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase())}**: Assessment data missing\n`;
+             }
         }
     } else {
-        report += "Overall assessment data is missing.\n";
+         report += "Overall assessment data is missing.\n";
     }
 
-    // Add issue summary
+    // Add issue summary (check if statistics exist)
     report += `\n## Issue Summary\n\n`;
-    const stats = results.statistics || {};
-    report += `- Critical Issues: ${stats.critical ?? 0}\n`;
-    report += `- Major Issues: ${stats.major ?? 0}\n`;
-    report += `- Minor Issues: ${stats.minor ?? 0}\n`;
+     const stats = results.statistics || {};
+     report += `- Critical Issues: ${stats.critical ?? 0}\n`;
+     report += `- Major Issues: ${stats.major ?? 0}\n`;
+     report += `- Minor Issues: ${stats.minor ?? 0}\n`;
 
-    // Add top recommendations
+    // Add top recommendations (check if overallRecommendations exists and is an array)
     report += `\n## Top Recommendations\n\n`;
-    if (Array.isArray(results.overallRecommendations)) {
-        results.overallRecommendations.forEach((rec, index) => {
-            report += `${index + 1}. ${rec || 'N/A'}\n`;
-        });
-        if (results.overallRecommendations.length === 0) {
-            report += "No specific overall recommendations provided.\n";
-        }
-    } else {
-        report += "Overall recommendations data is missing or invalid.\n";
-    }
+     if (Array.isArray(results.overallRecommendations)) {
+         results.overallRecommendations.forEach((rec, index) => {
+             report += `${index + 1}. ${rec || 'N/A'}\n`;
+         });
+          if (results.overallRecommendations.length === 0) {
+              report += "No specific overall recommendations provided.\n";
+          }
+     } else {
+         report += "Overall recommendations data is missing or invalid.\n";
+     }
 
-    // Add prioritized issues
-    report += `\n## Prioritized Issues List\n\n`;
-    if (Array.isArray(results.prioritizedIssues) && results.prioritizedIssues.length > 0) {
-        results.prioritizedIssues.forEach((issue, index) => {
-            if (issue && typeof issue === 'object') {
-                report += `### ${index + 1}. ${issue.issue || 'Issue description missing'}\n`;
-                report += `- **Severity**: ${issue.severity || 'N/A'}\n`;
-                report += `- **Location**: ${issue.location || 'N/A'}\n`;
-                report += `- **Recommendation**: ${issue.recommendation || 'N/A'}\n\n`;
-            }
-        });
-    } else {
-        report += "No prioritized issues listed.\n";
-    }
+    // Add prioritized issues (check if prioritizedIssues exists and is an array)
+     report += `\n## Prioritized Issues List\n\n`;
+     if (Array.isArray(results.prioritizedIssues) && results.prioritizedIssues.length > 0) {
+          results.prioritizedIssues.forEach((issue, index) => {
+              if (issue && typeof issue === 'object') { // Check if issue object is valid
+                  report += `### ${index + 1}. ${issue.issue || 'Issue description missing'}\n`;
+                  report += `- **Severity**: ${issue.severity || 'N/A'}\n`;
+                  report += `- **Location**: ${issue.location || 'N/A'}\n`;
+                  report += `- **Recommendation**: ${issue.recommendation || 'N/A'}\n\n`;
+              }
+          });
+     } else {
+         report += "No prioritized issues listed.\n";
+     }
 
-    // Add abstract analysis
+    // Add abstract analysis (check existence and structure)
     if (results.abstract && typeof results.abstract === 'object') {
       report += `\n## Abstract Analysis\n\n`;
       report += `> ${results.abstract.text || 'Abstract text missing.'}\n\n`; // Use blockquote for text
@@ -193,55 +193,58 @@ export const generateSummaryReport = async (results, submissionId) => {
         report += "\n## Abstract Analysis\n\nAbstract data missing or invalid.\n";
     }
 
-    // Add section analysis summaries
+    // Add section analysis summaries (check existence and structure)
     report += `\n## Section Analysis\n\n`;
-    if (Array.isArray(results.sections) && results.sections.length > 0) {
-        results.sections.forEach((section, sIndex) => {
-            if (section && typeof section === 'object') {
-                report += `### ${section.name || `Unnamed Section ${sIndex + 1}`}\n\n`;
-                if (Array.isArray(section.paragraphs) && section.paragraphs.length > 0) {
-                    section.paragraphs.forEach((paragraph, pIndex) => {
-                        if (paragraph && typeof paragraph === 'object') {
-                            report += `#### Paragraph ${pIndex + 1}\n\n`;
-                            report += `> ${paragraph.text_preview ? paragraph.text_preview + '...' : 'Paragraph text missing...'}\n\n`; // Use blockquote
-                            report += `**Summary**: ${paragraph.summary || 'No summary.'}\n\n`;
+     if (Array.isArray(results.sections) && results.sections.length > 0) {
+         results.sections.forEach((section, sIndex) => {
+             if (section && typeof section === 'object') { // Check section validity
+                 report += `### ${section.name || `Unnamed Section ${sIndex + 1}`}\n\n`;
+                 if (Array.isArray(section.paragraphs) && section.paragraphs.length > 0) {
+                      section.paragraphs.forEach((paragraph, pIndex) => {
+                          if (paragraph && typeof paragraph === 'object') { // Check paragraph validity
+                              report += `#### Paragraph ${pIndex + 1}\n\n`;
+                              
+                              // Include full paragraph text instead of just a preview
+                              report += `${paragraph.text || 'Paragraph text missing'}\n\n`;
+                              
+                              report += `**Summary**: ${paragraph.summary || 'No summary.'}\n\n`;
 
-                            // Structure assessment
-                            report += `**Structure Assessment**:\n`;
-                            // Access evaluations object correctly
-                            const evaluations = paragraph.evaluations || {};
-                            report += `- Context-Content-Conclusion: ${evaluations.cccStructure ? '✓ Yes' : '✗ No'}\n`;
-                            report += `- Sentence Quality: ${evaluations.sentenceQuality ? '✓ Good' : '✗ Needs Work'}\n`;
-                            report += `- Topic Continuity: ${evaluations.topicContinuity ? '✓ Good' : '✗ Fragmented'}\n`;
-                            report += `- Terminology Consistency: ${evaluations.terminologyConsistency ? '✓ Yes' : '✗ No'}\n`;
-                            report += `- Structural Parallelism: ${evaluations.structuralParallelism ? '✓ Yes' : '✗ No'}\n\n`;
+                              // Structure assessment (check evaluations object)
+                              report += `**Structure Assessment**:\n`;
+                              // Use the actual boolean values from paragraph.evaluations
+                              const evaluations = paragraph.evaluations || {};
+                              report += `- Context-Content-Conclusion: ${evaluations.cccStructure ? '✓ Yes' : '✗ No'}\n`;
+                              report += `- Sentence Quality: ${evaluations.sentenceQuality ? '✓ Good' : '✗ Needs Work'}\n`;
+                              report += `- Topic Continuity: ${evaluations.topicContinuity ? '✓ Good' : '✗ Fragmented'}\n`;
+                              report += `- Terminology Consistency: ${evaluations.terminologyConsistency ? '✓ Yes' : '✗ No'}\n`;
+                              report += `- Structural Parallelism: ${evaluations.structuralParallelism ? '✓ Yes' : '✗ No'}\n\n`;
 
-                            // Issues
-                            if (Array.isArray(paragraph.issues) && paragraph.issues.length > 0) {
-                                report += `**Issues Found**:\n\n`;
-                                paragraph.issues.forEach((issue, iIndex) => {
-                                    if (issue && typeof issue === 'object') {
-                                        report += `${iIndex + 1}. **${(issue.severity || 'N/A').toUpperCase()}**: ${issue.issue || 'Issue description missing.'}\n`;
-                                        report += `   - *Recommendation*: ${issue.recommendation || 'N/A'}\n\n`;
-                                    }
-                                });
-                            } else {
-                                report += "**Issues Found**: None\n\n";
-                            }
-                        } else {
-                            report += `#### Paragraph ${pIndex + 1}\n\nInvalid paragraph data.\n\n`;
-                        }
-                    });
-                } else {
-                    report += "No paragraphs found or paragraph data is invalid for this section.\n\n";
-                }
-            } else {
-                report += `### Unnamed Section ${sIndex + 1}\n\nInvalid section data.\n\n`;
-            }
-        });
-    } else {
-        report += "No sections found or section data is invalid.\n";
-    }
+                              // Issues
+                              if (Array.isArray(paragraph.issues) && paragraph.issues.length > 0) {
+                                  report += `**Issues Found**:\n\n`;
+                                  paragraph.issues.forEach((issue, iIndex) => {
+                                       if (issue && typeof issue === 'object') {
+                                           report += `${iIndex + 1}. **${(issue.severity || 'N/A').toUpperCase()}**: ${issue.issue || 'Issue description missing.'}\n`;
+                                           report += `   - *Recommendation*: ${issue.recommendation || 'N/A'}\n\n`;
+                                       }
+                                  });
+                              } else {
+                                   report += "**Issues Found**: None\n\n";
+                              }
+                          } else {
+                               report += `#### Paragraph ${pIndex + 1}\n\nInvalid paragraph data.\n\n`;
+                          }
+                      });
+                 } else {
+                      report += "No paragraphs found or paragraph data is invalid for this section.\n\n";
+                 }
+             } else {
+                  report += `### Unnamed Section ${sIndex + 1}\n\nInvalid section data.\n\n`;
+             }
+         });
+     } else {
+         report += "No sections found or section data is invalid.\n";
+     }
 
     // Write report to file
     await writeFileAsync(filePath, report);
@@ -254,6 +257,7 @@ export const generateSummaryReport = async (results, submissionId) => {
   }
 };
 
+
 /**
  * Read a file from storage
  * @param {string} filePath - Path to file
@@ -261,15 +265,17 @@ export const generateSummaryReport = async (results, submissionId) => {
  */
 export const readFile = async (filePath) => {
   try {
-    console.log(`[StorageService] Reading file from path: ${filePath}`);
-    if (!filePath || typeof filePath !== 'string') {
-        throw new Error('Invalid file path provided for reading.');
-    }
+     console.log(`[StorageService] Reading file from path: ${filePath}`);
+    // Basic check to ensure path seems plausible before reading
+     if (!filePath || typeof filePath !== 'string') {
+         throw new Error('Invalid file path provided for reading.');
+     }
     const data = await readFileAsync(filePath);
-    console.log(`[StorageService] File read successfully. Size: ${data.length}`);
+     console.log(`[StorageService] File read successfully. Size: ${data.length}`);
     return data;
   } catch (error) {
     console.error('[StorageService] Error reading file:', filePath, error);
+    // Throw a new error to avoid exposing raw fs errors potentially
     throw new Error(`Failed to read file at path: ${path.basename(filePath)}`);
   }
 };
@@ -281,19 +287,24 @@ export const readFile = async (filePath) => {
  */
 export const deleteFile = async (filePath) => {
   try {
-    console.log(`[StorageService] Attempting to delete file: ${filePath}`);
-    try {
-        await accessAsync(filePath, fs.constants.F_OK);
-        await unlinkAsync(filePath);
-        console.log(`[StorageService] Successfully deleted file: ${filePath}`);
-    } catch (err) {
-        if (err.code === 'ENOENT') {
-            console.log(`[StorageService] File not found, skipping deletion: ${filePath}`);
-        } else {
-            throw err;
-        }
-    }
+     console.log(`[StorageService] Attempting to delete file: ${filePath}`);
+     // Use fs.promises.access to check existence first
+      try {
+          await accessAsync(filePath, fs.constants.F_OK);
+          // File exists, proceed with deletion
+          await unlinkAsync(filePath);
+          console.log(`[StorageService] Successfully deleted file: ${filePath}`);
+      } catch (err) {
+           // If file doesn't exist (ENOENT), log it but don't throw an error
+           if (err.code === 'ENOENT') {
+               console.log(`[StorageService] File not found, skipping deletion: ${filePath}`);
+           } else {
+               // For other errors (like permissions), re-throw
+               throw err;
+           }
+      }
   } catch (error) {
+    // Log deletion errors but don't throw to prevent breaking cleanup process
     console.error(`[StorageService] Error deleting file: ${filePath}`, error);
   }
 };
@@ -311,12 +322,12 @@ export const scheduleCleanup = (submissionId) => {
   setTimeout(async () => {
     console.log(`[StorageService] Starting cleanup for submission ID: ${submissionId}`);
     try {
-      await initStorage(); // Ensure temp dir exists before reading it
+       await initStorage(); // Ensure temp dir exists before reading it
       const files = await readdirAsync(TEMP_DIR);
 
       // Find all files matching this submission ID prefix
       const matchingFiles = files.filter(file => file.startsWith(submissionId));
-      console.log(`[StorageService] Found ${matchingFiles.length} files matching ${submissionId} for cleanup.`);
+       console.log(`[StorageService] Found ${matchingFiles.length} files matching ${submissionId} for cleanup.`);
 
       // Delete each matching file
       const deletePromises = matchingFiles.map(file =>
@@ -327,6 +338,7 @@ export const scheduleCleanup = (submissionId) => {
 
       console.log(`[StorageService] Completed cleanup for submission ${submissionId}`);
     } catch (error) {
+      // Log errors during the cleanup process itself
       console.error(`[StorageService] Error during scheduled cleanup for ${submissionId}:`, error);
     }
   }, CLEANUP_DELAY);
