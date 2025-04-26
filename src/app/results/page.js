@@ -3,9 +3,9 @@
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-// Corrected relative path: ../../ goes up from 'results' to 'app', then 'src'
+// ****** THIS IS THE LINE TO CHECK - Ensure it uses ../../ ******
 import { useAppContext } from '../../context/AppContext.jsx'
-import ResultsDisplay from '../../components/ResultsDisplay.jsx' // This relative path looks correct
+import ResultsDisplay from '../../components/ResultsDisplay.jsx' // This relative path should be correct
 import Link from 'next/link'
 
 export default function ResultsPage() {
