@@ -2,10 +2,10 @@
 'use client'
 
 import { useState } from 'react'
-// ****** THIS IS THE CRITICAL LINE - ENSURE IT HAS .jsx ******
-import FileUploader from '@/components/FileUploader.jsx'
-import HistoryDisplay from '@/components/HistoryDisplay.jsx'
-import { useAppContext } from '@/context/AppContext.jsx'
+// Using relative paths instead of alias
+import FileUploader from '../components/FileUploader.jsx'
+import HistoryDisplay from '../components/HistoryDisplay.jsx'
+import { useAppContext } from '../context/AppContext.jsx'
 import { useRouter } from 'next/navigation'
 
 export default function Home() {
