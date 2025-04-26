@@ -116,7 +116,6 @@ export const generateSummaryReport = async (results, submissionId) => {
         throw new Error('Invalid results data for report generation.');
     }
 
-
     // --- Report Generation Logic ---
     let report = `# Scientific Paper Structure Assessment\n\n`;
 
@@ -141,14 +140,12 @@ export const generateSummaryReport = async (results, submissionId) => {
          report += "Overall assessment data is missing.\n";
     }
 
-
     // Add issue summary (check if statistics exist)
     report += `\n## Issue Summary\n\n`;
      const stats = results.statistics || {};
      report += `- Critical Issues: ${stats.critical ?? 0}\n`;
      report += `- Major Issues: ${stats.major ?? 0}\n`;
      report += `- Minor Issues: ${stats.minor ?? 0}\n`;
-
 
     // Add top recommendations (check if overallRecommendations exists and is an array)
     report += `\n## Top Recommendations\n\n`;
@@ -162,7 +159,6 @@ export const generateSummaryReport = async (results, submissionId) => {
      } else {
          report += "Overall recommendations data is missing or invalid.\n";
      }
-
 
     // Add prioritized issues (check if prioritizedIssues exists and is an array)
      report += `\n## Prioritized Issues List\n\n`;
@@ -178,7 +174,6 @@ export const generateSummaryReport = async (results, submissionId) => {
      } else {
          report += "No prioritized issues listed.\n";
      }
-
 
     // Add abstract analysis (check existence and structure)
     if (results.abstract && typeof results.abstract === 'object') {
@@ -211,16 +206,18 @@ export const generateSummaryReport = async (results, submissionId) => {
                       section.paragraphs.forEach((paragraph, pIndex) => {
                           if (paragraph && typeof paragraph === 'object') { // Check paragraph validity
                               report += `#### Paragraph ${pIndex + 1}\n\n`;
-                              report += `> ${paragraph.text ? paragraph.text.substring(0, 100) + '...' : 'Paragraph text missing...'}\n\n`; // Use blockquote
+                              report += `> ${paragraph.text_preview ? paragraph.text_preview + '...' : 'Paragraph text missing...'}\n\n`; // Use blockquote
                               report += `**Summary**: ${paragraph.summary || 'No summary.'}\n\n`;
 
                               // Structure assessment (check boolean properties)
                               report += `**Structure Assessment**:\n`;
-                              report += `- Context-Content-Conclusion: ${paragraph.cccStructure ? '✓ Yes' : '✗ No'}\n`;
-                              report += `- Sentence Quality: ${paragraph.sentenceQuality ? '✓ Good' : '✗ Needs Work'}\n`;
-                              report += `- Topic Continuity: ${paragraph.topicContinuity ? '✓ Good' : '✗ Fragmented'}\n`;
-                              report += `- Terminology Consistency: ${paragraph.terminologyConsistency ? '✓ Yes' : '✗ No'}\n`;
-                              report += `- Structural Parallelism: ${paragraph.structuralParallelism ? '✓ Yes' : '✗ No'}\n\n`;
+                              // FIXED: Use the actual boolean values from paragraph.evaluations
+                              const evaluations = paragraph.evaluations || {};
+                              report += `- Context-Content-Conclusion: ${evaluations.cccStructure ? '✓ Yes' : '✗ No'}\n`;
+                              report += `- Sentence Quality: ${evaluations.sentenceQuality ? '✓ Good' : '✗ Needs Work'}\n`;
+                              report += `- Topic Continuity: ${evaluations.topicContinuity ? '✓ Good' : '✗ Fragmented'}\n`;
+                              report += `- Terminology Consistency: ${evaluations.terminologyConsistency ? '✓ Yes' : '✗ No'}\n`;
+                              report += `- Structural Parallelism: ${evaluations.structuralParallelism ? '✓ Yes' : '✗ No'}\n\n`;
 
                               // Issues
                               if (Array.isArray(paragraph.issues) && paragraph.issues.length > 0) {
@@ -249,7 +246,6 @@ export const generateSummaryReport = async (results, submissionId) => {
          report += "No sections found or section data is invalid.\n";
      }
 
-
     // Write report to file
     await writeFileAsync(filePath, report);
     console.log(`[StorageService] Summary report generated successfully.`);
@@ -257,12 +253,9 @@ export const generateSummaryReport = async (results, submissionId) => {
     return filePath;
   } catch (error) {
     console.error('[StorageService] Error generating summary report:', error);
-    // Don't throw here maybe, just return null or log? Depends on requirements.
-    // Throwing is safer to indicate failure.
     throw new Error('Failed to generate summary report');
   }
 };
-
 
 /**
  * Read a file from storage
@@ -280,72 +273,4 @@ export const readFile = async (filePath) => {
      console.log(`[StorageService] File read successfully. Size: ${data.length}`);
     return data;
   } catch (error) {
-    console.error('[StorageService] Error reading file:', filePath, error);
-    // Throw a new error to avoid exposing raw fs errors potentially
-    throw new Error(`Failed to read file at path: ${path.basename(filePath)}`);
-  }
-};
-
-/**
- * Delete a file from storage
- * @param {string} filePath - Path to file
- * @returns {Promise<void>}
- */
-export const deleteFile = async (filePath) => {
-  try {
-     console.log(`[StorageService] Attempting to delete file: ${filePath}`);
-     // Use fs.promises.access to check existence first
-      try {
-          await accessAsync(filePath, fs.constants.F_OK);
-          // File exists, proceed with deletion
-          await unlinkAsync(filePath);
-          console.log(`[StorageService] Successfully deleted file: ${filePath}`);
-      } catch (err) {
-           // If file doesn't exist (ENOENT), log it but don't throw an error
-           if (err.code === 'ENOENT') {
-               console.log(`[StorageService] File not found, skipping deletion: ${filePath}`);
-           } else {
-               // For other errors (like permissions), re-throw
-               throw err;
-           }
-      }
-  } catch (error) {
-    // Log deletion errors but don't throw to prevent breaking cleanup process
-    console.error(`[StorageService] Error deleting file: ${filePath}`, error);
-  }
-};
-
-/**
- * Clean up files associated with a submission ID after a TTL.
- * @param {string} submissionId - ID of submission to clean up
- * @returns {void} - Schedules cleanup, doesn't return Promise
- */
-export const scheduleCleanup = (submissionId) => {
-    const CLEANUP_DELAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-    console.log(`[StorageService] Scheduling cleanup for submission ID: ${submissionId} in ${CLEANUP_DELAY / 1000 / 3600} hours.`);
-
-  // Schedule deletion
-  setTimeout(async () => {
-    console.log(`[StorageService] Starting cleanup for submission ID: ${submissionId}`);
-    try {
-       await initStorage(); // Ensure temp dir exists before reading it
-      const files = await readdirAsync(TEMP_DIR);
-
-      // Find all files matching this submission ID prefix
-      const matchingFiles = files.filter(file => file.startsWith(submissionId));
-       console.log(`[StorageService] Found ${matchingFiles.length} files matching ${submissionId} for cleanup.`);
-
-      // Delete each matching file
-      const deletePromises = matchingFiles.map(file =>
-          deleteFile(path.join(TEMP_DIR, file))
-      );
-
-      await Promise.all(deletePromises); // Wait for all deletions
-
-      console.log(`[StorageService] Completed cleanup for submission ${submissionId}`);
-    } catch (error) {
-      // Log errors during the cleanup process itself
-      console.error(`[StorageService] Error during scheduled cleanup for ${submissionId}:`, error);
-    }
-  }, CLEANUP_DELAY);
-};
+    console.error('[StorageService] Error reading file:', fileP
