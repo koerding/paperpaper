@@ -1,0 +1,157 @@
+{
+  "meta": {
+    "title": "Paragraph-Level Rules for Structuring Papers",
+    "authors": ["Brett Mensh", "Konrad Kording"],
+    "publication": "PLoS Computational Biology",
+    "year": 2017,
+    "doi": "https://doi.org/10.1371/journal.pcbi.1005619"
+  },
+  "overview": "These rules focus on paragraph-level structure in scientific writing. They help writers create clear, logical, and reader-friendly paragraphs that effectively communicate scientific ideas.",
+  "rules": [
+    {
+      "id": "2B",
+      "originalRuleNumber": 2,
+      "parentRule": "Write for flesh-and-blood human beings who do not know your work",
+      "category": "Principles",
+      "title": "Manage cognitive load for your readers",
+      "fullText": "The vast knowledge base of human psychology is useful in paper writing. For example, people have working memory constraints in that they can only remember a small number of items and are better at remembering the beginning and the end of a list than the middle. Do your best to minimize the number of loose threads that the reader has to keep in mind at any one time.",
+      "checkpoints": [
+        {
+          "component": "sentence_length",
+          "criterion": "appropriate_length",
+          "description": "Average sentence length is under 25 words, with no sentence exceeding 40 words"
+        },
+        {
+          "component": "sentence_complexity",
+          "criterion": "readable_structure",
+          "description": "Sentences have a Flesch-Kincaid readability score appropriate for scientific literature (Grade 12-16)"
+        },
+        {
+          "component": "concept_density",
+          "criterion": "digestible_introduction",
+          "description": "No more than 2-3 new technical concepts are introduced per paragraph"
+        },
+        {
+          "component": "nested_logic",
+          "criterion": "limited_nesting",
+          "description": "Logical structures (if-then, cause-effect) are not nested more than two levels deep"
+        },
+        {
+          "component": "paragraph_length",
+          "criterion": "focused_chunks",
+          "description": "Paragraphs are limited to 4-6 sentences, focusing on a single idea or step"
+        }
+      ]
+    },
+    {
+      "id": "3B",
+      "originalRuleNumber": 3,
+      "parentRule": "Stick to the context-content-conclusion (C-C-C) scheme",
+      "category": "Principles",
+      "title": "Apply context-content-conclusion structure at the paragraph level",
+      "fullText": "The C-C-C scheme defines the structure of the paper on multiple scales. Applying C-C-C at the paragraph scale, the first sentence defines the topic or context, the body hosts the novel content put forth for the reader's consideration, and the last sentence provides the conclusion to be remembered. Deviating from the C-C-C structure often leads to papers that are hard to read, but writers often do so because of their own autobiographical context. During our everyday lives as scientists, we spend a majority of our time producing content and a minority amidst a flurry of other activities. We run experiments, develop the exposition of available literature, and combine thoughts using the magic of human cognition. It is natural to want to record these efforts on paper and structure a paper chronologically. But for our readers, most details of our activities are extraneous. They do not care about the chronological path by which you reached a result; they just care about the ultimate claim and the logic supporting it. Thus, all our work must be reformatted to provide a context that makes our material meaningful and a conclusion that helps the reader to understand and remember it.",
+      "checkpoints": [
+        {
+          "component": "topic_sentences",
+          "criterion": "context_first",
+          "description": "First sentence of each paragraph establishes context or introduces the topic"
+        },
+        {
+          "component": "paragraph_body",
+          "criterion": "substantive_content",
+          "description": "Middle sentences provide evidence, data, or elaboration of the topic"
+        },
+        {
+          "component": "concluding_sentences",
+          "criterion": "provides_takeaway",
+          "description": "Final sentence of each paragraph offers a conclusion or key takeaway"
+        },
+        {
+          "component": "paragraph_structure",
+          "criterion": "logical_not_chronological",
+          "description": "Paragraph organization follows logical rather than chronological structure"
+        },
+        {
+          "component": "paragraph_coherence",
+          "criterion": "complete_unit",
+          "description": "Each paragraph forms a complete thought unit with clear beginning, middle, and end"
+        }
+      ]
+    },
+    {
+      "id": "4B",
+      "originalRuleNumber": 4,
+      "parentRule": "Optimize your logical flow by avoiding zig-zag and using parallelism",
+      "category": "Principles",
+      "title": "Optimize logical flow using parallelism",
+      "fullText": "Across consecutive paragraphs or sentences, parallel messages should be communicated with parallel form. Parallelism makes it easier to read the text because the reader is familiar with the structure. For example, if we have three independent reasons why we prefer one interpretation of a result over another, it is helpful to communicate them with the same syntax so that this syntax becomes transparent to the reader, which allows them to focus on the content. There is nothing wrong with using the same word multiple times in a sentence or paragraph. Resist the temptation to use a different word to refer to the same concept—doing so makes readers wonder if the second word has a slightly different meaning.",
+      "checkpoints": [
+        {
+          "component": "similar_concepts",
+          "criterion": "structural_consistency",
+          "description": "Similar concepts are presented using similar grammatical structures and patterns"
+        },
+        {
+          "component": "terminology",
+          "criterion": "consistent_vocabulary",
+          "description": "Same terms are used consistently for the same concepts throughout, avoiding synonyms that could suggest different meanings"
+        },
+        {
+          "component": "list_items",
+          "criterion": "grammatical_parallelism",
+          "description": "Items in lists or series use parallel grammatical forms (all nouns, all verb phrases, etc.)"
+        },
+        {
+          "component": "sequential_points",
+          "criterion": "parallel_presentation",
+          "description": "Sequence of similar points (e.g., arguments, examples, methods) follows consistent structural patterns"
+        },
+        {
+          "component": "section_format",
+          "criterion": "consistent_organization",
+          "description": "Similar sections (e.g., experiment descriptions) follow consistent organizational patterns"
+        }
+      ]
+    },
+    {
+      "id": "7C",
+      "originalRuleNumber": 7,
+      "parentRule": "Deliver the results as a sequence of statements, supported by figures, that connect logically to support the central contribution",
+      "category": "Components",
+      "title": "Structure results paragraphs as question-data-answer units",
+      "fullText": "The first results paragraph is special in that it typically summarizes the overall approach to the problem outlined in the introduction, along with any key innovative methods that were developed. Most readers do not read the methods, so this paragraph gives them the gist of the methods that were used. Each subsequent paragraph in the results section starts with a sentence or two that set up the question that the paragraph answers, such as the following: 'To verify that there are no artifacts...,' 'What is the test-retest reliability of our measure?,' or 'We next tested whether Ca2+ flux through L-type Ca2+ channels was involved.' The middle of the paragraph presents data and logic that pertain to the question, and the paragraph ends with a sentence that answers the question. For example, it may conclude that none of the potential artifacts were detected. This structure makes it easy for experienced readers to fact-check a paper. Each paragraph convinces the reader of the answer given in its last sentence. This makes it easy to find the paragraph in which a suspicious conclusion is drawn and to check the logic of that paragraph. The result of each paragraph is a logical statement, and paragraphs farther down in the text rely on the logical conclusions of previous paragraphs, much as theorems are built in mathematical literature.",
+      "checkpoints": [
+        {
+          "component": "results_first_paragraph",
+          "criterion": "method_overview",
+          "description": "First paragraph of results summarizes the approach and key methods needed to understand findings"
+        },
+        {
+          "component": "paragraph_questions",
+          "criterion": "clear_purpose",
+          "description": "Each results paragraph begins by stating a question or purpose that will be addressed"
+        },
+        {
+          "component": "data_presentation",
+          "criterion": "evidence_provision",
+          "description": "Middle of each paragraph presents relevant data and evidence"
+        },
+        {
+          "component": "paragraph_conclusions",
+          "criterion": "answer_statements",
+          "description": "Each results paragraph ends with a clear statement answering the initial question"
+        },
+        {
+          "component": "logical_dependencies",
+          "criterion": "builds_on_previous",
+          "description": "Later paragraphs build on conclusions established in earlier paragraphs"
+        },
+        {
+          "component": "paragraph_transition",
+          "criterion": "smooth_connection",
+          "description": "Transitions between paragraphs create a coherent flow of experimental logic"
+        }
+      ]
+    }
+  ]
+}
