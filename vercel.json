@@ -1,11 +1,8 @@
 {
   "version": 2,
   "functions": {
-    "app/api/analyze/route.js": {
-      "maxDuration": 600
-    },
-    "app/api/*/route.js": {
-      "maxDuration": 600
+    "**/*.js": {
+      "maxDuration": 300
     }
   }
 }
