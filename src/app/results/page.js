@@ -18,7 +18,7 @@ export default function ResultsPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    console.log('[ResultsPage CLEAN] useEffect triggered. ID:', submissionId);
+    console.log('[ResultsPage CLEAN] useEffect triggered. ID:', submissionId); // Added CLEAN marker
     setLoading(true);
     setError(null);
     setSubmission(null);
@@ -26,12 +26,14 @@ export default function ResultsPage() {
     if (submissionId) {
       console.log('[ResultsPage CLEAN] Attempting to get submission for ID:', submissionId);
       try {
-        const sub = getSubmission(submissionId);
+        const sub = getSubmission(submissionId); // Get submission data from context
 
         if (sub) {
           console.log('[ResultsPage CLEAN] Submission found in context:', { id: sub.id, status: sub.status, hasResults: !!sub.results });
+          // **** Log full structure for debugging ****
           console.log('[ResultsPage CLEAN] Full submission object structure:', JSON.stringify(sub, null, 2));
-          setSubmission(sub);
+          // *****************************************
+          setSubmission(sub); // Set the found submission
         } else {
           console.warn('[ResultsPage CLEAN] Submission not found in context for ID:', submissionId);
           setError('Submission not found. It might have been cleared from history or the ID is invalid.');
@@ -44,7 +46,8 @@ export default function ResultsPage() {
       console.warn('[ResultsPage CLEAN] No submission ID found in URL.');
       setError('No submission ID provided in the URL.');
     }
-    setLoading(false);
+    setLoading(false); // Loading finished
+  // Dependency array: Rerun when ID changes, or when the list of submissions potentially updates
   }, [submissionId, getSubmission, submissions]);
 
 
@@ -120,11 +123,11 @@ export default function ResultsPage() {
              Submission Details
           </div>
          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-           {/* ... details grid ... */}
-           <div><p className="text-xs ...">File Name</p><p className="font-medium ...">{submission.fileName || 'N/A'}</p></div>
-           <div><p className="text-xs ...">Date Submitted</p><p className="font-medium ...">{submission.date ? new Date(submission.date).toLocaleString() : 'N/A'}</p></div>
-           <div><p className="text-xs ...">Status</p><p className="font-medium ...">{submission.status || 'Unknown'}</p></div>
-           {submission.fileSize && <div><p className="text-xs ...">File Size</p><p className="font-medium ...">{(submission.fileSize / 1024).toFixed(1)} KB</p></div>}
+           {/* Submission details rendered here */}
+           <div><p className="text-xs text-muted-foreground uppercase tracking-wider">File Name</p><p className="font-medium break-words mt-0.5">{submission.fileName || 'N/A'}</p></div>
+           <div><p className="text-xs text-muted-foreground uppercase tracking-wider">Date Submitted</p><p className="font-medium mt-0.5">{submission.date ? new Date(submission.date).toLocaleString() : 'N/A'}</p></div>
+           <div><p className="text-xs text-muted-foreground uppercase tracking-wider">Status</p><p className="font-medium capitalize mt-0.5">{submission.status || 'Unknown'}</p></div>
+           {submission.fileSize && <div><p className="text-xs text-muted-foreground uppercase tracking-wider">File Size</p><p className="font-medium mt-0.5">{(submission.fileSize / 1024).toFixed(1)} KB</p></div>}
          </div>
        </div>
 
@@ -175,7 +178,7 @@ export default function ResultsPage() {
           </div>
       )}
 
-      {/* **** ADD THIS MARKER **** */}
+      {/* **** Fuchsia Marker **** */}
       <h2 style={{color: 'fuchsia', border: '3px dashed fuchsia', marginTop: '20px', padding: '10px', textAlign: 'center' }}>
           --- END OF ResultsPage CONDITIONAL RENDERING --- (Should not see MnK Summary below this)
       </h2>
@@ -183,4 +186,4 @@ export default function ResultsPage() {
 
     </div>
   )
-}
+} // End of the ResultsPage component
