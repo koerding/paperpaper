@@ -2,19 +2,19 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-// Using relative paths
+// Using absolute paths with @ alias
 import {
   extractTextFromFile,
   validateDocumentSize
-} from '../../../services/ProcessingService.js';
-import { analyzeDocumentStructure } from '../../../services/AIService.js';
+} from '@/services/ProcessingService.js';
+import { analyzeDocumentStructure } from '@/services/AIService.js';
 import {
   saveFile,
   saveResults,
   generateSummaryReport,
   scheduleCleanup
-} from '../../../services/StorageService.js';
-import { MAX_CHAR_COUNT } from '../../../lib/constants.js';
+} from '@/services/StorageService.js';
+import { MAX_CHAR_COUNT } from '@/lib/constants.js';
 
 // DEBUG HELPER: Write content to debug file
 const writeDebugFile = async (prefix, content, submissionId) => {
