@@ -1,44 +1,99 @@
-// Improved AIService.js with JSON rules file parsing
+// Improved AIService.js with no file system debug logging
 
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
 import path from 'path';
 
-// Debug helper
-const writeDebugFile = async (prefix, content) => {
-    try {
-        const debugDir = path.join(process.cwd(), 'debug_logs');
-        if (!fs.existsSync(debugDir)) fs.mkdirSync(debugDir, { recursive: true });
-        
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = path.join(debugDir, `${prefix}-${timestamp}.json`);
-        
-        fs.writeFileSync(filename, typeof content === 'object' 
-            ? JSON.stringify(content, null, 2) : content);
-        return filename;
-    } catch (err) {
-        console.error(`[AIService] Debug file error:`, err);
-        return null;
-    }
+// Safe console logging that won't break in production
+const safeLog = (prefix, message) => {
+  try {
+    console.log(`[AIService] ${prefix}: ${typeof message === 'object' ? JSON.stringify(message).substring(0, 200) + '...' : message}`);
+  } catch (error) {
+    console.log(`[AIService] Error logging ${prefix}`);
+  }
 };
 
-// Load rule JSON files
+// Load rule JSON files - with robust error handling
 const loadRules = () => {
+  try {
+    // Load paragraph-level rules
+    let paragraphRules;
+    let documentRules;
+    
     try {
-        // Load paragraph-level rules
-        const paragraphRulesPath = path.join(process.cwd(), 'src', 'paragraph-rules.json');
-        const paragraphRules = JSON.parse(fs.readFileSync(paragraphRulesPath, 'utf8'));
-        
-        // Load document-level rules
-        const documentRulesPath = path.join(process.cwd(), 'src', 'document-rules.json');
-        const documentRules = JSON.parse(fs.readFileSync(documentRulesPath, 'utf8'));
-        
-        console.log('[AIService] Successfully loaded paragraph and document rules');
-        return { paragraphRules, documentRules };
-    } catch (error) {
-        console.error('[AIService] Error loading rules:', error);
-        throw new Error('Failed to load rule files');
+      // Try loading from filesystem first
+      const paragraphRulesPath = path.join(process.cwd(), 'src', 'paragraph-rules.json');
+      paragraphRules = JSON.parse(fs.readFileSync(paragraphRulesPath, 'utf8'));
+      
+      // Load document-level rules
+      const documentRulesPath = path.join(process.cwd(), 'src', 'document-rules.json');
+      documentRules = JSON.parse(fs.readFileSync(documentRulesPath, 'utf8'));
+      
+      console.log('[AIService] Successfully loaded paragraph and document rules from files');
+    } catch (fsError) {
+      console.error('[AIService] Could not load rules from filesystem:', fsError);
+      console.log('[AIService] Using hardcoded default rules');
+      
+      // Provide simplified default rules if file access fails
+      paragraphRules = {
+        rules: [
+          {
+            id: "3B",
+            title: "Apply context-content-conclusion structure at the paragraph level",
+            fullText: "Each paragraph should have a clear structure with context, content, and conclusion.",
+            checkpoints: [
+              { description: "First sentence establishes context or introduces the topic" },
+              { description: "Middle sentences provide evidence, data, or elaboration of the topic" },
+              { description: "Final sentence offers a conclusion or key takeaway" }
+            ]
+          },
+          {
+            id: "2B", 
+            title: "Manage cognitive load for your readers",
+            fullText: "Keep sentences at a reasonable length and limit complexity.",
+            checkpoints: [
+              { description: "Average sentence length is under 25 words" },
+              { description: "No more than 2-3 new technical concepts are introduced per paragraph" }
+            ]
+          }
+        ]
+      };
+      
+      documentRules = {
+        rules: [
+          {
+            id: "5",
+            title: "Tell a complete story in the abstract",
+            fullText: "The abstract should contain all key elements of the paper in miniature.",
+            checkpoints: [
+              { description: "Abstract begins with broad context before narrowing to specific research gap" },
+              { description: "Abstract explicitly identifies the specific gap or problem the research addresses" },
+              { description: "Abstract ends with interpretation of results and statement of broader significance" }
+            ]
+          },
+          {
+            id: "1",
+            title: "Focus your paper on a central contribution",
+            fullText: "The paper should have a clear single main message.",
+            checkpoints: [
+              { description: "Title explicitly contains the main finding or central contribution" },
+              { description: "Abstract presents a single focused message rather than multiple distinct claims" },
+              { description: "Different sections consistently support the same central contribution" }
+            ]
+          }
+        ]
+      };
     }
+    
+    return { paragraphRules, documentRules };
+  } catch (error) {
+    console.error('[AIService] Error loading rules:', error);
+    // Return minimal default rules rather than throwing
+    return { 
+      paragraphRules: { rules: [] },
+      documentRules: { rules: [] }
+    };
+  }
 };
 
 // Phase 1: Extract document structure only
@@ -78,7 +133,7 @@ ${rawText}
 Respond ONLY with the JSON object.`
     }];
     
-    await writeDebugFile('01-structure-extraction-prompt', structurePrompt);
+    safeLog('structure-extraction-prompt', structurePrompt);
     
     try {
         const response = await openai.chat.completions.create({
@@ -89,7 +144,11 @@ Respond ONLY with the JSON object.`
         });
         
         const structureResult = JSON.parse(response.choices[0]?.message?.content);
-        await writeDebugFile('02-structure-extraction-result', structureResult);
+        safeLog('structure-extraction-result', { 
+          title: structureResult.title, 
+          abstractLength: structureResult.abstract?.length || 0,
+          sectionCount: structureResult.sections?.length || 0
+        });
         return structureResult;
     } catch (error) {
         console.error('[AIService] Error extracting document structure:', error);
@@ -107,6 +166,7 @@ async function evaluateParagraphs(openai, model, title, abstract, sections) {
     
     // Load paragraph rules
     const { paragraphRules } = loadRules();
+    safeLog('loaded-rules', `Found ${paragraphRules.rules?.length || 0} paragraph rules`);
     
     // Create a structured rules prompt from the JSON file
     const rulesPrompt = paragraphRules.rules.map(rule => {
@@ -153,7 +213,7 @@ Return a JSON object with this structure:
 Respond ONLY with the JSON object.`
         }];
         
-        await writeDebugFile('03-abstract-analysis-prompt', abstractPrompt);
+        safeLog('abstract-analysis-prompt', 'Sending abstract analysis prompt');
         
         try {
             const response = await openai.chat.completions.create({
@@ -170,7 +230,10 @@ Respond ONLY with the JSON object.`
                 issues: abstractResult.issues || []
             };
             
-            await writeDebugFile('04-abstract-analysis-result', abstractAnalysis);
+            safeLog('abstract-analysis-result', { 
+              summaryLength: abstractResult.summary?.length || 0,
+              issueCount: abstractResult.issues?.length || 0
+            });
         } catch (error) {
             console.error('[AIService] Error evaluating abstract:', error);
         }
@@ -236,7 +299,7 @@ ${batch.map((p, idx) => `PARAGRAPH ${i + idx + 1}:\n${p}`).join('\n\n')}
 Respond ONLY with the JSON object.`
             }];
             
-            await writeDebugFile('05-paragraph-batch-prompt', batchPrompt);
+            safeLog('paragraph-batch-prompt', { batchSize: batch.length, startIndex: i });
             
             try {
                 const response = await openai.chat.completions.create({
@@ -247,7 +310,9 @@ Respond ONLY with the JSON object.`
                 });
                 
                 const batchResult = JSON.parse(response.choices[0]?.message?.content);
-                await writeDebugFile('06-paragraph-batch-result', batchResult);
+                safeLog('paragraph-batch-result', { 
+                  resultCount: batchResult.evaluations?.length || 0 
+                });
                 
                 if (batchResult.evaluations && Array.isArray(batchResult.evaluations)) {
                     evaluatedParagraphs.push(...batchResult.evaluations);
@@ -295,6 +360,7 @@ async function generateDocumentAssessment(openai, model, title, abstract, sectio
     
     // Load document rules
     const { documentRules } = loadRules();
+    safeLog('loaded-document-rules', `Found ${documentRules.rules?.length || 0} document rules`);
     
     // Create a structured rules prompt from the JSON file
     const rulesPrompt = documentRules.rules.map(rule => {
@@ -375,7 +441,7 @@ Return a JSON object with this structure:
 Respond ONLY with the JSON object.`
     }];
     
-    await writeDebugFile('07-document-assessment-prompt', docPrompt);
+    safeLog('document-assessment-prompt', 'Sending document assessment prompt');
     
     try {
         const response = await openai.chat.completions.create({
@@ -386,7 +452,11 @@ Respond ONLY with the JSON object.`
         });
         
         const assessmentResult = JSON.parse(response.choices[0]?.message?.content);
-        await writeDebugFile('08-document-assessment-result', assessmentResult);
+        safeLog('document-assessment-result', { 
+          assessmentCount: Object.keys(assessmentResult.documentAssessment || {}).length,
+          majorIssuesCount: assessmentResult.majorIssues?.length || 0,
+          recommendationsCount: assessmentResult.overallRecommendations?.length || 0
+        });
         
         return assessmentResult;
     } catch (error) {
@@ -404,7 +474,7 @@ export async function analyzeDocumentStructure(document, rawText) {
     const serviceStartTime = Date.now();
     
     try {
-        await writeDebugFile('00-input-raw-text', rawText);
+        safeLog('input-raw-text', { textLength: rawText?.length || 0 });
         
         // Check OpenAI API
         if (!process.env.OPENAI_API_KEY) {
@@ -495,7 +565,11 @@ export async function analyzeDocumentStructure(document, rawText) {
             sections: evaluationResult.sections
         };
         
-        await writeDebugFile('final-results', finalResults);
+        safeLog('final-results', { 
+          title: finalResults.title?.substring(0, 30) + '...',
+          sectionCount: finalResults.sections?.length || 0,
+          statistics: finalResults.statistics
+        });
         console.log(`[AIService] Analysis completed in ${Date.now() - serviceStartTime}ms`);
         
         return finalResults;
