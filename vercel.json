@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "functions": {
+    "api/analyze": {
+      "maxDuration": 300
+    },
+    "api/*/route": {
+      "maxDuration": 300
+    }
+  }
+}
