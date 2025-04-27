@@ -1,5 +1,5 @@
 // File Path: src/services/AIService.js
-// Refactored for single OpenAI call
+// Refactored for single OpenAI call with improved prompt example
 
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
@@ -16,7 +16,6 @@ const safeLog = (prefix, message) => {
 };
 
 // --- Rule Loading ---
-// (Keep the existing robust loadRules function)
 const loadRules = () => {
   let paragraphRules = { rules: [] }; // Default empty
   let documentRules = { rules: [] }; // Default empty
@@ -49,7 +48,7 @@ const loadRules = () => {
 
 // --- Main Analysis Function (Refactored) ---
 export async function analyzeDocumentStructure(document /* unused */, rawText) {
-  console.log('[AIService] Starting single-call analysis...');
+  console.log('[AIService] Starting single-call analysis with improved prompt...'); // Updated log message
   const serviceStartTime = Date.now();
 
   try {
@@ -61,7 +60,6 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
         return {
             analysisError: 'Input document text is empty or invalid.',
             title: "Analysis Failed (Empty Input)",
-            // ... provide default empty structure ...
              abstract: { text: "", summary: "", issues: [] },
              documentAssessment: {},
              overallRecommendations: [],
@@ -76,7 +74,7 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
     }
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const model = process.env.OPENAI_MODEL || 'gpt-4o'; // Ensure this model supports large context/JSON mode
-     console.log(`[AIService] Using OpenAI model: ${model}`);
+    console.log(`[AIService] Using OpenAI model: ${model}`);
 
     // --- Load Rules ---
     const { paragraphRules, documentRules } = loadRules();
@@ -108,7 +106,7 @@ ${rule.checkpoints.map(cp => `- ${cp.description}`).join('\n')}
        console.warn(`[AIService] Input text truncated from ${rawText.length} to ${MAX_CHARS} characters.`);
     }
 
-
+    // --- ***** MODIFIED PROMPT START ***** ---
     const fullPrompt = `
 You are an expert scientific writing analyzer. Analyze the provided paper text based on established best practices.
 
@@ -135,101 +133,101 @@ ${documentRulesPrompt}
 --- END DOCUMENT RULES ---
 
 **REQUIRED OUTPUT FORMAT:**
-Return ONLY a single, valid JSON object with the following structure. Ensure all text content (title, abstract, paragraphs) is extracted verbatim.
+Return ONLY a single, valid JSON object matching the structure described and exemplified below. Ensure all text content (title, abstract, paragraphs) is extracted verbatim.
 
+**Structure Description:**
+The JSON object MUST have the following top-level keys: "title", "abstract", "documentAssessment", "majorIssues", "overallRecommendations", "sections".
+- "abstract" and "sections[*].paragraphs[*]" objects MUST contain "text", "summary", "evaluations" (with boolean flags), and "issues" array.
+- "documentAssessment" MUST contain keys for each document-level check (e.g., "titleQuality", "abstractCompleteness") with "score", "assessment", and "recommendation".
+- "majorIssues" MUST be an array of objects containing "issue", "location", "severity", "recommendation".
+- "overallRecommendations" MUST be an array of strings.
+- "sections" MUST be an array of objects, each with "name" and a "paragraphs" array.
+
+**Example of CORRECT JSON Structure:**
 \`\`\`json
 {
-  "title": "The full extracted paper title",
+  "title": "Example Paper Title",
   "abstract": {
-    "text": "The full extracted abstract text",
-    "summary": "Concise summary of the abstract's content",
-    "evaluations": {
-      "cccStructure": boolean,
-      "sentenceQuality": boolean,
-      "topicContinuity": boolean,
-      "terminologyConsistency": boolean,
-      "structuralParallelism": boolean
-    },
-    "issues": [
-      {
-        "issue": "Description of issue found in the abstract",
-        "severity": "critical | major | minor",
-        "recommendation": "Specific improvement suggestion for the abstract"
-      }
-      // ... more issues if found
-    ]
+    "text": "Full abstract text here...",
+    "summary": "Abstract summary.",
+    "evaluations": { "cccStructure": true, "sentenceQuality": false, "topicContinuity": true, "terminologyConsistency": true, "structuralParallelism": true },
+    "issues": [ { "issue": "Sentence length varies.", "severity": "minor", "recommendation": "Break up longer sentences." } ]
   },
   "documentAssessment": {
-    "titleQuality": { "score": 1-10, "assessment": "Evaluation of title quality", "recommendation": "Suggestion" },
-    "abstractCompleteness": { "score": 1-10, "assessment": "Evaluation of abstract completeness", "recommendation": "Suggestion" },
-    "introductionStructure": { "score": 1-10, "assessment": "Evaluation of introduction", "recommendation": "Suggestion" },
-    "resultsOrganization": { "score": 1-10, "assessment": "Evaluation of results section", "recommendation": "Suggestion" },
-    "discussionQuality": { "score": 1-10, "assessment": "Evaluation of discussion section", "recommendation": "Suggestion" },
-    "messageFocus": { "score": 1-10, "assessment": "Evaluation of single message focus", "recommendation": "Suggestion" },
-    "topicOrganization": { "score": 1-10, "assessment": "Evaluation of topic organization (zig-zag)", "recommendation": "Suggestion" }
-    // Add other document assessment keys as defined by your rules/needs
+    "titleQuality": { "score": 8, "assessment": "Good title.", "recommendation": "None." },
+    "abstractCompleteness": { "score": 7, "assessment": "Mostly complete.", "recommendation": "Add broader impact." },
+    "introductionStructure": { "score": 9, "assessment": "Clear structure.", "recommendation": "None." },
+    "resultsOrganization": { "score": 6, "assessment": "Needs clearer flow.", "recommendation": "Reorder Fig 2 and 3." },
+    "discussionQuality": { "score": 7, "assessment": "Good summary.", "recommendation": "Address limitations more." },
+    "messageFocus": { "score": 8, "assessment": "Strong focus.", "recommendation": "None." },
+    "topicOrganization": { "score": 7, "assessment": "Minor zig-zag.", "recommendation": "Combine related points in Discussion." }
   },
-   "majorIssues": [
+  "majorIssues": [
     {
-      "issue": "Description of a significant structural problem",
-      "location": "General area (e.g., Introduction, Overall Flow)",
-      "severity": "critical|major",
-      "recommendation": "Specific suggestion for improvement"
+      "issue": "Results lack clear logical progression.",
+      "location": "Results Section",
+      "severity": "major",
+      "recommendation": "Reorganize results to build argument step-by-step."
     }
-    // ... more major issues if found
   ],
   "overallRecommendations": [
-    "Top priority overall suggestion 1",
-    "Overall suggestion 2",
-    "Overall suggestion 3"
+    "Improve logical flow of the Results section.",
+    "Explicitly state broader impact in Abstract and Discussion."
   ],
   "sections": [
     {
-      "name": "Extracted Section Name (e.g., Introduction)",
+      "name": "Introduction",
       "paragraphs": [
         {
-          "text": "Full extracted text of paragraph 1",
-          "summary": "Concise summary of paragraph 1's content",
-          "evaluations": {
-            "cccStructure": boolean,
-            "sentenceQuality": boolean,
-            "topicContinuity": boolean,
-            "terminologyConsistency": boolean,
-            "structuralParallelism": boolean
-           },
-          "issues": [
-            {
-              "issue": "Description of issue found in paragraph 1",
-              "severity": "critical | major | minor",
-              "recommendation": "Specific improvement suggestion for paragraph 1"
-            }
-            // ... more issues if found
-          ]
+          "text": "Paragraph 1 text...",
+          "summary": "P1 summary.",
+          "evaluations": { "cccStructure": true, "sentenceQuality": true, "topicContinuity": true, "terminologyConsistency": true, "structuralParallelism": true },
+          "issues": []
         },
-        // ... more paragraphs in this section
+        {
+          "text": "Paragraph 2 text...",
+          "summary": "P2 summary.",
+          "evaluations": { "cccStructure": false, "sentenceQuality": true, "topicContinuity": true, "terminologyConsistency": true, "structuralParallelism": false },
+          "issues": [
+             { "issue": "Lacks conclusion.", "severity": "major", "recommendation": "Add concluding sentence." },
+             { "issue": "Parallelism inconsistent with previous paragraph.", "severity": "minor", "recommendation": "Restructure sentences for parallelism." }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Methods",
+      "paragraphs": [
+         {
+          "text": "Methods paragraph 1 text...",
+          "summary": "Methods P1 summary.",
+          "evaluations": { "cccStructure": true, "sentenceQuality": true, "topicContinuity": true, "terminologyConsistency": true, "structuralParallelism": true },
+          "issues": []
+        }
       ]
     }
-    // ... more sections
+    // ... other sections
   ]
 }
 \`\`\`
 
 **IMPORTANT:**
-* Ensure the JSON is well-formed.
+* Ensure the output is a single, valid JSON object.
 * Extract all text content accurately.
 * Apply all specified rules thoroughly.
 * Provide boolean values for paragraph evaluations.
-* Adhere strictly to the requested JSON structure.
+* **Adhere STRICTLY to the JSON structure described and exemplified above.** Pay close attention to the top-level keys and nesting.
 `;
+    // --- ***** MODIFIED PROMPT END ***** ---
+
 
     // --- Make the Single API Call ---
-    safeLog('openai-request', 'Sending consolidated analysis request...');
+    safeLog('openai-request', 'Sending consolidated analysis request with improved prompt...');
     const response = await openai.chat.completions.create({
       model: model,
       messages: [{ role: 'user', content: fullPrompt }],
-      response_format: { type: "json_object" }, // Requires compatible model like gpt-4o or gpt-4-turbo-preview
-      temperature: 0.1, // Low temperature for consistent structural output
-      // Consider adding max_tokens if needed, but JSON mode often handles this well
+      response_format: { type: "json_object" }, // Requires compatible model
+      temperature: 0.1, // Low temperature for structural consistency
     });
 
     const analysisResultRaw = response.choices[0]?.message?.content;
@@ -245,72 +243,83 @@ Return ONLY a single, valid JSON object with the following structure. Ensure all
          analysisResult = JSON.parse(analysisResultRaw);
      } catch (parseError) {
          console.error("[AIService] Failed to parse OpenAI JSON response:", parseError);
-         // Attempt to extract partial info or return error structure
-          throw new Error(`Failed to parse analysis results from AI. Raw response: ${analysisResultRaw.substring(0, 500)}...`);
+         throw new Error(`Failed to parse analysis results from AI. Raw response: ${analysisResultRaw.substring(0, 500)}...`);
      }
 
-     // Basic validation of the parsed structure
-     if (!analysisResult || typeof analysisResult !== 'object' || !analysisResult.sections) {
-          console.error("[AIService] Parsed JSON structure is invalid or missing key fields:", analysisResult);
-          throw new Error("Parsed analysis result from AI is missing required fields (e.g., 'sections').");
-     }
+     // --- KEEP THE FLEXIBLE PARSING LOGIC AS A FALLBACK ---
+     // Still useful if the AI slightly deviates despite the example.
+     const docAssessment = analysisResult.documentAssessment || {};
+     const majorIssues = analysisResult.majorIssues // Check top-level first
+         || (typeof docAssessment === 'object' ? docAssessment.majorIssues : undefined) // Check nested
+         || []; // Default
+     const overallRecommendations = analysisResult.overallRecommendations // Check top-level first
+         || (typeof docAssessment === 'object' ? docAssessment.overallRecommendations : undefined) // Check nested
+         || []; // Default
+     const sections = analysisResult.sections // Check top-level first
+         || (typeof docAssessment === 'object' ? docAssessment.sections : undefined) // Check nested
+         || []; // Default
+
 
     // --- Calculate Statistics (Post-Processing) ---
     let criticalCount = 0, majorCount = 0, minorCount = 0;
-
-    // Function to count issues in an issue array
     const countIssues = (issues) => {
-      if (Array.isArray(issues)) {
-        issues.forEach(issue => {
-          if (issue && issue.severity) {
-             switch (issue.severity) {
-               case 'critical': criticalCount++; break;
-               case 'major': majorCount++; break;
-               case 'minor': minorCount++; break;
-             }
-          }
-        });
-      }
+        if (Array.isArray(issues)) {
+            issues.forEach(issue => {
+                if (issue && issue.severity) {
+                    switch (issue.severity) {
+                        case 'critical': criticalCount++; break;
+                        case 'major': majorCount++; break;
+                        case 'minor': minorCount++; break;
+                    }
+                }
+            });
+        }
     };
-
-    // Count abstract issues
-    if (analysisResult.abstract) {
-        countIssues(analysisResult.abstract.issues);
+    // Count issues using the potentially corrected arrays
+    if (analysisResult.abstract) { countIssues(analysisResult.abstract.issues); }
+    if (majorIssues) {
+        majorIssues.forEach(issue => {
+            if (issue.severity === 'critical') criticalCount++;
+            if (issue.severity === 'major') majorCount++;
+        });
     }
-     // Count major document issues provided by AI
-     if(analysisResult.majorIssues) {
-         analysisResult.majorIssues.forEach(issue => {
-             if (issue.severity === 'critical') criticalCount++;
-             if (issue.severity === 'major') majorCount++;
-             // Minor issues aren't typically listed as "majorIssues"
-         })
+     if (Array.isArray(sections)) {
+        sections.forEach(section => {
+            if (Array.isArray(section.paragraphs)) {
+                section.paragraphs.forEach(para => {
+                    countIssues(para.issues);
+                });
+            }
+        });
      }
 
 
-    // Count paragraph issues
-    if (Array.isArray(analysisResult.sections)) {
-      analysisResult.sections.forEach(section => {
-        if (Array.isArray(section.paragraphs)) {
-          section.paragraphs.forEach(para => {
-            countIssues(para.issues);
-          });
-        }
-      });
-    }
-
     // --- Construct Final Output ---
-    // Ensure all expected top-level keys exist, even if empty
     const finalResults = {
       title: analysisResult.title || "Title Not Found",
       abstract: analysisResult.abstract || { text: "", summary: "", evaluations: {}, issues: [] },
-      documentAssessment: analysisResult.documentAssessment || {},
-      majorIssues: analysisResult.majorIssues || [], // From AI's assessment
-      overallRecommendations: analysisResult.overallRecommendations || [],
+      // Explicitly list expected assessment keys to build the object correctly
+      documentAssessment: {
+          titleQuality: docAssessment.titleQuality,
+          abstractCompleteness: docAssessment.abstractCompleteness,
+          introductionStructure: docAssessment.introductionStructure,
+          resultsOrganization: docAssessment.resultsOrganization,
+          discussionQuality: docAssessment.discussionQuality,
+          messageFocus: docAssessment.messageFocus,
+          topicOrganization: docAssessment.topicOrganization,
+          // Add other expected assessment keys here if needed
+      },
+      majorIssues: majorIssues, // Use potentially corrected array
+      overallRecommendations: overallRecommendations, // Use potentially corrected array
       statistics: { critical: criticalCount, major: majorCount, minor: minorCount },
-      sections: analysisResult.sections || [],
-      // Note: prioritizedIssues list is removed as it was generated client-side before.
-      // If needed, it could be reconstructed here by iterating through all issues again.
+      sections: sections, // Use potentially corrected array
     };
+
+     // Final validation to ensure sections array was found
+     if (!Array.isArray(finalResults.sections)) {
+         console.error("[AIService] Error: Could not locate the 'sections' array in the AI response, even with fallback checks.");
+         throw new Error("Failed to extract 'sections' array from the AI response structure.");
+     }
 
     safeLog('final-results-structure', {
       title: finalResults.title?.substring(0, 50) + '...',
@@ -326,8 +335,8 @@ Return ONLY a single, valid JSON object with the following structure. Ensure all
 
   } catch (error) {
     console.error('[AIService] Critical error during single-call analysis:', error);
-    // Return a structured error response
-    return {
+     // Return structured error response
+     return {
       analysisError: `Failed to complete analysis: ${error.message}`,
       title: "Analysis Failed",
       abstract: { text: rawText?.substring(0, 200) + '...' || "", summary: "Analysis failed.", evaluations: {}, issues: [] },
