@@ -36,7 +36,7 @@ export async function GET(request) {
     }
 
     // Prevent path traversal attacks
-    const normalizedPath = path.normalize(filePath);
+    let normalizedPath = path.normalize(filePath); // Changed from const to let
     // Use /tmp in production environment for Vercel
     const tempDir = process.env.NODE_ENV === 'production'
       ? '/tmp'
@@ -74,7 +74,7 @@ export async function GET(request) {
             await fs.promises.access(tmpFallbackPath, fs.constants.F_OK);
             // If found in fallback location, use that path
             safeLog('fallback-file-exists', 'Using fallback path');
-            normalizedPath = tmpFallbackPath;
+            normalizedPath = tmpFallbackPath; // This was the line causing the error
           } catch (fallbackErr) {
             // Neither original nor fallback exists
             console.error(`[API /download] Error: File not found in any location`);
