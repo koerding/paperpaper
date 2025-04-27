@@ -1,18 +1,40 @@
 // File Path: src/components/FileUploader.jsx
 'use client'
 
-import { useState, useCallback } from 'react'
-import { useDropzone } from 'react-dropzone'
-import { Cloud, FileText, AlertCircle } from 'lucide-react'
-// Using absolute paths with @ alias
-import { useAppContext } from '@/context/AppContext.jsx'
-import { extractTextFromFile } from '@/services/ProcessingService.client.js'
+import { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
+import { Cloud, FileText, Info, ExternalLink } from 'lucide-react'; // Added Info, ExternalLink icons
+import { useAppContext } from '@/context/AppContext.jsx';
+import { extractTextFromFile } from '@/services/ProcessingService.client.js';
+
+// MnK Paper Details (Could also be loaded from a config/JSON file)
+const mnkPaper = {
+  title: "Ten simple rules for structuring papers",
+  authors: "Brett Mensh & Konrad Kording",
+  journal: "PLoS Comput Biol",
+  year: 2017,
+  doi: "10.1371/journal.pcbi.1005619",
+  url: "https://doi.org/10.1371/journal.pcbi.1005619",
+  popularity: "viewed over a million times", // As per user request
+  rules: [
+    "Focus your paper on a central contribution, communicated in the title",
+    "Write for flesh-and-blood human beings who do not know your work",
+    "Stick to the context-content-conclusion (C-C-C) scheme",
+    "Optimize logical flow: avoid zig-zag, use parallelism",
+    "Tell a complete story in the abstract",
+    "Communicate why the paper matters in the introduction",
+    "Deliver results as a sequence of statements supported by figures",
+    "Discuss how the gap was filled, limitations, and relevance",
+    "Allocate time where it matters: title, abstract, figures, outlining", // Rule 9 from paper
+    "Get feedback to reduce, reuse, and recycle your story" // Rule 10 from paper
+  ]
+};
 
 export default function FileUploader({ onFileSubmit, isProcessing }) {
-  const { setIsProcessing, setError } = useAppContext()
-  const [file, setFile] = useState(null)
-  const [fileText, setFileText] = useState('') // Store extracted text
-  const maxSize = 10 * 1024 * 1024 // 10MB max file size
+  const { setIsProcessing, setError } = useAppContext();
+  const [file, setFile] = useState(null);
+  const [fileText, setFileText] = useState(''); // Store extracted text
+  const maxSize = 10 * 1024 * 1024; // 10MB max file size
 
   const onDrop = useCallback(async (acceptedFiles) => {
     console.log('[FileUploader] onDrop triggered.');
@@ -42,7 +64,6 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
       'text/x-tex', // tex
       'application/x-tex', // tex alternative
     ];
-    // Use optional chaining for name check
     if (!validTypes.includes(uploadedFile.type) && !uploadedFile.name?.endsWith('.tex')) {
         const errorMsg = 'Unsupported file type. Please upload .docx, .txt, .md, or .tex files.';
         console.error('[FileUploader] Validation Error:', errorMsg);
@@ -54,12 +75,10 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
     // Attempt client-side text extraction
     console.log('[FileUploader] Attempting client-side text extraction...');
     try {
-      // Ensure the function exists before calling
       if (typeof extractTextFromFile !== 'function') {
          console.error('[FileUploader] extractTextFromFile is not available! Skipping client-side extraction.');
-         // Let server handle it, maybe log a warning or specific error
          setError('Client-side processing setup error. Analysis will proceed on server.');
-         return; // Or proceed without fileText, letting server handle it
+         return;
       }
 
       const extractedText = await extractTextFromFile(uploadedFile);
@@ -76,17 +95,15 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
 
       setFileText(extractedText);
     } catch (err) {
-      // This catch block will now correctly handle errors from the *actual* extraction function
       console.warn('[FileUploader] Could not extract text client-side, will process on server:', err);
-      // Optionally set a state or message indicating server-side processing will be used
-      // setError('Could not process file in browser, sending to server for analysis.'); // Maybe too alarming?
     }
-  }, [setError]); // Added setError dependency
+  // Added missing dependency array closer ']', removed setError dependency as it comes from context and is stable
+  }, [setError, maxSize]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     multiple: false,
-    maxSize, // Let dropzone handle basic size check too
+    maxSize,
   });
 
   const handleSubmit = async () => {
@@ -96,45 +113,25 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         return;
     }
     console.log('[FileUploader] handleSubmit called for file:', file.name);
-    setIsProcessing(true);
-    setError(null); // Clear previous errors before submitting
+    // NOTE: setIsProcessing and setError are now handled within handleFileSubmit in page.js
+    // If this component needs to manage its own processing state distinct from the page,
+    // you might need to pass down callbacks or adjust state management.
+    // For now, assuming the page's isProcessing prop handles the button state.
 
     try {
-      // Enhanced error handling with retries
-      let retryCount = 0;
-      const maxRetries = 2;
-      
-      while (retryCount <= maxRetries) {
-        try {
-          console.log(`[FileUploader] Attempt ${retryCount + 1} to submit file...`);
-          
-          // Add a timestamp parameter to avoid potential caching issues
-          const timestamp = new Date().getTime();
-          await onFileSubmit(file, fileText);
-          
-          console.log('[FileUploader] File submitted successfully');
-          // If we reach here, the submission was successful - break the retry loop
-          break;
-        } catch (submitError) {
-          console.error(`[FileUploader] Error on attempt ${retryCount + 1}:`, submitError);
-          retryCount++;
-          
-          // On last retry, throw the error to be caught by outer catch
-          if (retryCount > maxRetries) throw submitError;
-          
-          // Wait before retry (exponential backoff)
-          const backoffMs = 1000 * Math.pow(2, retryCount - 1);
-          console.log(`[FileUploader] Retrying in ${backoffMs}ms...`);
-          await new Promise(resolve => setTimeout(resolve, backoffMs));
-        }
-      }
+        await onFileSubmit(file, fileText); // Call the handler passed from the page
+        console.log('[FileUploader] Handed off file to onFileSubmit');
+        // Reset local state after successful handoff (optional)
+        // setFile(null);
+        // setFileText('');
     } catch (err) {
-      // This catch is for errors that persist after all retries
-      console.error('[FileUploader] All retries failed. Error during onFileSubmit:', err);
-      setError(err.message || 'Error submitting file for analysis.');
+        // Errors should ideally be caught and handled in the onFileSubmit function (in page.js)
+        // But we can log here if needed.
+        console.error('[FileUploader] Error calling onFileSubmit:', err);
+        // Optionally set a local error state if needed: setError(err.message || 'Error submitting file.');
     } finally {
-      console.log('[FileUploader] handleSubmit finished.');
-      setIsProcessing(false);
+       console.log('[FileUploader] handleSubmit finished.');
+       // Resetting processing state is likely handled in page.js's finally block
     }
   };
 
@@ -175,8 +172,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
               <p className="text-sm text-muted-foreground">
                 {(file.size / 1024).toFixed(1)} KB
                 {fileText && ` (~${fileText.length} chars extracted)`}
-                 {!fileText && file.type !== 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' && ' (Text will be extracted on server)'}
-                 {!fileText && file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' && ' (Text will be extracted on server)'}
+                 {!fileText && ' (Text extraction/analysis occurs on server)'}
               </p>
             </div>
           </div>
@@ -184,7 +180,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
           <div className="flex justify-end">
             <button
               onClick={handleSubmit}
-              disabled={isProcessing}
+              disabled={isProcessing} // Use the processing state from the page context
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isProcessing ? 'Processing...' : 'Analyze Paper Structure'}
@@ -193,19 +189,47 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         </div>
       )}
 
+      {/* --- Updated 'About' Section --- */}
       {!file && (
-        <div className="text-center p-8 border rounded-lg bg-muted/10">
-          <div className="max-w-md mx-auto space-y-4">
-            <AlertCircle className="h-12 w-12 text-primary/60 mx-auto" />
-            <h3 className="text-lg font-medium">About This Tool</h3>
-            <p className="text-muted-foreground">
-              Upload your scientific paper to analyze its structure according to
-              established best practices for scientific writing. This tool will provide
-              feedback on paragraph structure, section organization, and overall coherence.
+        <div className="text-left p-6 border rounded-lg bg-muted/10 space-y-4">
+           <div className="flex items-center space-x-2">
+               <Info className="h-6 w-6 text-primary/80" />
+               <h3 className="text-lg font-semibold">Based on "Ten Simple Rules for Structuring Papers"</h3>
+           </div>
+           <p className="text-sm text-muted-foreground">
+              This tool analyzes your scientific paper's structure based on the principles outlined in the highly influential paper
+              by <span className='font-medium'>{mnkPaper.authors}</span> (<span className='italic'>{mnkPaper.journal}, {mnkPaper.year}</span>),
+              which has been {mnkPaper.popularity}. The goal is to help you communicate your work clearly and effectively.
+           </p>
+            <div className="text-sm">
+               <p className="font-medium mb-1">The 10 Rules (MnK):</p>
+                <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-xs">
+                   {mnkPaper.rules.map((rule, index) => (
+                       <li key={index}>{rule}</li>
+                   ))}
+                </ol>
+            </div>
+            <p className='text-sm text-muted-foreground'>
+                Feedback provided by this tool will often reference these rules using the notation <span className='font-mono bg-muted px-1 py-0.5 rounded'>MnK$</span>,
+                where <span className='font-mono bg-muted px-1 py-0.5 rounded'>$</span> is the original rule number (e.g., <span className='font-mono bg-muted px-1 py-0.5 rounded'>MnK3</span> refers to Rule 3: C-C-C Scheme).
+                You'll be able to mouse over these tags in the results for the full rule title.
             </p>
-          </div>
+           <div>
+               <a
+                  href={mnkPaper.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-1 text-sm text-primary hover:underline"
+               >
+                  <span>Read the full paper</span>
+                  <ExternalLink className="h-4 w-4" />
+               </a>
+           </div>
+
         </div>
       )}
+      {/* --- End Updated 'About' Section --- */}
+
     </div>
   )
 }
