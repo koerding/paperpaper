@@ -16,32 +16,13 @@ import {
 } from '@/services/StorageService.js';
 import { MAX_CHAR_COUNT } from '@/lib/constants.js';
 
-// DEBUG HELPER: Write content to debug file
-const writeDebugFile = async (prefix, content, submissionId) => {
-    try {
-        // Create debug directory if it doesn't exist
-        const debugDir = path.join(process.cwd(), 'debug_logs');
-        if (!fs.existsSync(debugDir)) {
-            fs.mkdirSync(debugDir, { recursive: true });
-        }
-        
-        // Write to timestamped debug file with submission ID
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = path.join(debugDir, `route-${prefix}-${submissionId}-${timestamp}.json`);
-        
-        // Format content based on type
-        let formattedContent = content;
-        if (typeof content === 'object') {
-            formattedContent = JSON.stringify(content, null, 2);
-        }
-        
-        fs.writeFileSync(filename, formattedContent);
-        console.log(`[API Debug] Wrote ${prefix} to ${filename}`);
-        return filename;
-    } catch (err) {
-        console.error(`[API Debug] Failed to write debug file for ${prefix}:`, err);
-        return null;
-    }
+// Safe console logging that won't break the API
+const safeLog = (prefix, message) => {
+  try {
+    console.log(`[API /analyze] ${prefix}: ${typeof message === 'object' ? JSON.stringify(message).substring(0, 200) + '...' : message}`);
+  } catch (error) {
+    console.log(`[API /analyze] Error logging ${prefix}`);
+  }
 };
 
 /**
@@ -79,21 +60,30 @@ export async function POST(request) {
     if (formData.has('fileText')) {
       fileText = formData.get('fileText');
       console.log('[API /analyze] Client-extracted text found.');
-      await writeDebugFile('client-extracted-text', fileText, submissionId);
+      // No debug file writing in production
     } else {
       console.log('[API /analyze] No client-extracted text. Processing file on server...');
       const buffer = Buffer.from(await file.arrayBuffer());
       try {
          filePath = await saveFile(buffer, file.name, submissionId);
-         console.log(`[API /analyze] File saved temporarily to: ${filePath}`);
+         if (filePath) {
+           console.log(`[API /analyze] File saved temporarily to: ${filePath}`);
+         } else {
+           console.log(`[API /analyze] File could not be saved, but continuing with in-memory processing`);
+         }
       } catch (saveError) {
          console.error('[API /analyze] Error saving temporary file:', saveError);
+         // Continue anyway, we'll process the file in memory
       }
       
       console.log('[API /analyze] Attempting server-side text extraction...');
-      fileText = await extractTextFromFile(file);
-      console.log(`[API /analyze] Server-side text extraction successful. Length: ${fileText?.length || 0}`);
-      await writeDebugFile('server-extracted-text', fileText, submissionId);
+      try {
+        fileText = await extractTextFromFile(file);
+        console.log(`[API /analyze] Server-side text extraction successful. Length: ${fileText?.length || 0}`);
+      } catch (extractError) {
+        console.error('[API /analyze] Error extracting text from file:', extractError);
+        return NextResponse.json({ error: `Could not extract text from the file: ${extractError.message}` }, { status: 400 });
+      }
     }
 
     // Validate document size
@@ -107,54 +97,83 @@ export async function POST(request) {
     // Call AI service with the extracted text
     console.log(`[API /analyze] >>>>>>>>>> Calling analyzeDocumentStructure in AIService for ID: ${submissionId}...`);
     const analysisStartTime = Date.now();
-    // Pass the raw text directly to the AI service - no document structure needed anymore
-    const analysisResults = await analyzeDocumentStructure(null, fileText);
+    
+    // Implement timeout for the AI analysis
+    const timeoutDuration = 180000; // 3 minutes in milliseconds
+    const analysisPromise = analyzeDocumentStructure(null, fileText);
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Analysis timed out after 3 minutes')), timeoutDuration);
+    });
+    
+    // Race the analysis against a timeout
+    let analysisResults;
+    try {
+      analysisResults = await Promise.race([analysisPromise, timeoutPromise]);
+    } catch (timeoutError) {
+      console.error(`[API /analyze] Analysis timed out for ID: ${submissionId}`);
+      return NextResponse.json({ 
+        error: 'Analysis took too long to complete. Please try again with a shorter document.' 
+      }, { status: 504 });
+    }
+    
     const analysisEndTime = Date.now();
     console.log(`[API /analyze] <<<<<<<<<< AIService analyzeDocumentStructure completed for ID: ${submissionId}. Duration: ${analysisEndTime - analysisStartTime}ms`);
 
     if (typeof analysisResults !== 'object' || analysisResults === null) {
        console.error('[API /analyze] Error: AI analysis did not return a valid object.');
-       throw new Error('AI analysis failed to produce valid results.');
+       return NextResponse.json({ 
+         error: 'AI analysis failed to produce valid results.' 
+       }, { status: 500 });
     }
-    console.log('[API /analyze] AI analysis raw results:', JSON.stringify(analysisResults).substring(0, 200) + '...'); // Log snippet of results
     
-    // DEBUG - Save analysis results
-    await writeDebugFile('analysis-results', analysisResults, submissionId);
+    safeLog('AI analysis result snippet', analysisResults);
 
-    // Save results and generate report
+    // Save results and generate report - don't block on these operations
     let resultsPath = null;
-    try {
-        resultsPath = await saveResults(analysisResults, submissionId);
-        console.log(`[API /analyze] Analysis results saved to: ${resultsPath}`);
-    } catch(saveErr) {
-        console.error('[API /analyze] Error saving analysis results JSON:', saveErr);
-    }
-    
     let reportPath = null;
-    try {
-        if (typeof analysisResults === 'object' && analysisResults !== null) {
-            reportPath = await generateSummaryReport(analysisResults, submissionId);
-            console.log(`[API /analyze] Summary report generated at: ${reportPath}`);
-        } else {
-             console.warn('[API /analyze] Skipping report generation due to invalid analysis results.');
-        }
-    } catch (reportErr) {
-        console.error('[API /analyze] Error generating summary report:', reportErr);
-    }
     
-    // Schedule cleanup of temporary files
-    if (filePath || resultsPath || reportPath) {
-        scheduleCleanup(submissionId);
-        console.log(`[API /analyze] File cleanup scheduled for submission ID: ${submissionId}`);
-    } else {
-        console.log(`[API /analyze] No files to schedule cleanup for submission ID: ${submissionId}`);
+    // Wrap in try/catch but don't await - let these run in background
+    try {
+        // Fire and forget - these operations will continue in background
+        saveResults(analysisResults, submissionId).then(path => {
+          if (path) {
+            console.log(`[API /analyze] Analysis results saved to: ${path}`);
+            resultsPath = path;
+            
+            // Generate report after results are saved
+            if (typeof analysisResults === 'object' && analysisResults !== null) {
+              generateSummaryReport(analysisResults, submissionId).then(rPath => {
+                if (rPath) {
+                  console.log(`[API /analyze] Summary report generated at: ${rPath}`);
+                  reportPath = rPath;
+                }
+              }).catch(reportErr => {
+                console.error('[API /analyze] Error generating summary report:', reportErr);
+              });
+            }
+          }
+        }).catch(saveErr => {
+          console.error('[API /analyze] Error saving analysis results JSON:', saveErr);
+        });
+    } catch (error) {
+        console.error('[API /analyze] Error initiating background save operations:', error);
+    }
+
+    // Schedule cleanup of temporary files - don't block on this
+    try {
+      scheduleCleanup(submissionId);
+      console.log(`[API /analyze] File cleanup scheduled for submission ID: ${submissionId}`);
+    } catch (cleanupError) {
+      console.error('[API /analyze] Error scheduling cleanup:', cleanupError);
     }
 
     // Generate download links
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host')}`;
-    const reportLinks = {};
-    if (reportPath) reportLinks.report = `${baseUrl}/api/download?path=${encodeURIComponent(reportPath)}`;
-    if (resultsPath) reportLinks.json = `${baseUrl}/api/download?path=${encodeURIComponent(resultsPath)}`;
+    const reportLinks = {
+      // These will be populated if/when the files are eventually saved
+      report: `${baseUrl}/api/download?path=${encodeURIComponent(`/tmp/report-${submissionId}.md`)}`,
+      json: `${baseUrl}/api/download?path=${encodeURIComponent(`/tmp/results-${submissionId}.json`)}`
+    };
 
     console.log(`[API /analyze] Preparing successful response for ID: ${submissionId}`);
     
@@ -165,9 +184,7 @@ export async function POST(request) {
       reportLinks
     };
     
-    // DEBUG - Save final response
-    await writeDebugFile('final-response', finalResponse, submissionId);
-    
+    // Return the response immediately
     return NextResponse.json(finalResponse);
 
   } catch (error) {
@@ -181,5 +198,12 @@ export async function POST(request) {
 
 export function OPTIONS() {
   console.log('[API /analyze] Received OPTIONS request.');
-  return NextResponse.json({}, { status: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization' } });
+  return NextResponse.json({}, { 
+    status: 200, 
+    headers: { 
+      'Access-Control-Allow-Origin': '*', 
+      'Access-Control-Allow-Methods': 'POST, OPTIONS', 
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization' 
+    } 
+  });
 }
