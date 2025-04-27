@@ -171,12 +171,27 @@ export async function POST(request) {
     }
 
     // Generate download links
+    // Determine the correct base path for download links based on environment
+    // This logic MUST mirror the TEMP_DIR logic in StorageService.js and download/route.js
+    const TEMP_DIR_FOR_LINKS = process.env.NODE_ENV === 'production'
+      ? '/tmp'
+      : (process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp'));
+
+    const reportFilename = `report-${submissionId}.md`;
+    const jsonFilename = `results-${submissionId}.json`;
+
+    // Construct the full path used in the download link's 'path' query parameter
+    const reportPathForLink = path.join(TEMP_DIR_FOR_LINKS, reportFilename);
+    const jsonPathForLink = path.join(TEMP_DIR_FOR_LINKS, jsonFilename);
+
+
+    // Generate download links using the correctly determined paths
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host')}`;
     const reportLinks = {
-      // These will be populated if/when the files are eventually saved
-      report: `${baseUrl}/api/download?path=${encodeURIComponent(`/tmp/report-${submissionId}.md`)}`,
-      json: `${baseUrl}/api/download?path=${encodeURIComponent(`/tmp/results-${submissionId}.json`)}`
+      report: `${baseUrl}/api/download?path=${encodeURIComponent(reportPathForLink)}`,
+      json: `${baseUrl}/api/download?path=${encodeURIComponent(jsonPathForLink)}`
     };
+    safeLog('reportLinks-generated', reportLinks); // Add logging for generated links
 
     console.log(`[API /analyze] Preparing successful response for ID: ${submissionId}`);
     
