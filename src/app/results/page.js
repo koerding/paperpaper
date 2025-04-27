@@ -254,7 +254,7 @@ export default function Home() {
             <div className="mr-3 animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
             <p className="font-medium">{analysisProgress}</p>
           </div>
-          <p className="mt-2 text-sm">Paper analysis can take 1-3 minutes depending on length and complexity.</p>
+          <p className="mt-2 text-sm">Paper analysis can take up to 10 minutes depending on length and complexity.</p>
         </div>
       )}
 
