@@ -11,11 +11,5 @@
         "Access-Control-Allow-Headers": "Content-Type, Authorization"
       }
     }
-  ],
-  "functions": {
-    "src/app/api/**/*": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  }
+  ]
 }
