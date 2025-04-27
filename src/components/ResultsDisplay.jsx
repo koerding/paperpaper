@@ -1,7 +1,7 @@
 // File Path: src/components/ResultsDisplay.jsx
 'use client'
 
-import { useState, useEffect } from 'react'; // Added useEffect
+import { useState, useEffect } from 'react';
 import { Download, FileText, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
 
 // --- Helper Function to get Rule Title ---
@@ -9,15 +9,15 @@ import { Download, FileText, CheckCircle, AlertTriangle, AlertCircle } from 'luc
 // Make sure these numbers match the 'originalRuleNumber' in your rules files
 const ruleTitles = {
     '1': 'Rule 1: Focus on a central contribution, communicate in the title',
-    '2': 'Rule 2: Write for human beings who do not know your work', // Combined 2A/2B for simplicity
-    '3': 'Rule 3: Stick to the context-content-conclusion (C-C-C) scheme', // Combined 3A/3B
-    '4': 'Rule 4: Optimize logical flow (avoid zig-zag, use parallelism)', // Combined 4A/4B
+    '2': 'Rule 2: Write for human beings who do not know your work',
+    '3': 'Rule 3: Stick to the context-content-conclusion (C-C-C) scheme',
+    '4': 'Rule 4: Optimize logical flow (avoid zig-zag, use parallelism)',
     '5': 'Rule 5: Tell a complete story in the abstract',
     '6': 'Rule 6: Communicate why the paper matters in the introduction',
-    '7': 'Rule 7: Deliver results as a sequence of statements', // Combined 7A/7B/7C
-    '8': 'Rule 8: Discuss gap filled, limitations, and relevance', // Combined 8A/8B/8C
-    '9': 'Rule 9: Allocate time effectively (Title, Abstract, Figures, Outlining)', // Added from full rules
-    '10': 'Rule 10: Get feedback to reduce, reuse, and recycle', // Added from full rules
+    '7': 'Rule 7: Deliver results as a sequence of statements',
+    '8': 'Rule 8: Discuss gap filled, limitations, and relevance',
+    '9': 'Rule 9: Allocate time effectively (Title, Abstract, Figures, Outlining)',
+    '10': 'Rule 10: Get feedback to reduce, reuse, and recycle',
     // Add more mappings if needed
 };
 
@@ -63,12 +63,43 @@ export default function ResultsDisplay({ results }) {
    }, [results]);
 
 
-  if (!results) { /* ... no results handling ... */ }
-  // ... (keep helper functions: getSeverityIcon, formatScore, getScoreColor, getScoreBarBgClass) ...
-  const getSeverityIcon = (severity) => { /* ... */ };
-  const formatScore = (score) => { /* ... */ };
-  const getScoreColor = (score) => { /* ... */ };
-  const getScoreBarBgClass = (score) => { /* ... */ };
+  if (!results) {
+    return (
+        <div className="text-center p-8 border rounded-lg">
+            <p className="text-muted-foreground">No results available</p>
+        </div>
+        )
+  }
+
+  // Helper functions (ensure these are defined correctly)
+  const getSeverityIcon = (severity) => {
+    switch (severity) {
+      case 'critical': return <AlertCircle className="h-5 w-5 text-destructive" />;
+      case 'major': return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
+      case 'minor': return <AlertCircle className="h-5 w-5 text-blue-500" />;
+      default: return <CheckCircle className="h-5 w-5 text-green-500" />;
+    }
+  };
+  const formatScore = (score) => {
+    const numScore = Number(score);
+    if (isNaN(numScore)) return '—';
+    const boundedScore = Math.max(0, Math.min(10, numScore));
+    return boundedScore;
+   };
+  const getScoreColor = (score) => {
+    const numScore = Number(score);
+    if (isNaN(numScore)) return 'text-muted-foreground';
+    if (numScore >= 8) return 'text-green-600';
+    if (numScore >= 6) return 'text-yellow-600';
+    return 'text-destructive';
+   };
+  const getScoreBarBgClass = (score) => {
+    const numScore = Number(score);
+    if (isNaN(numScore)) return 'bg-muted';
+    if (numScore >= 8) return 'bg-green-500';
+    if (numScore >= 6) return 'bg-yellow-500';
+    return 'bg-destructive';
+   };
 
 
   return (
@@ -89,7 +120,13 @@ export default function ResultsDisplay({ results }) {
         <div className="flex space-x-2">
           {results.reportLinks && typeof results.reportLinks === 'object' && Object.entries(results.reportLinks).map(([key, url]) => (
              url && typeof url === 'string' && (
-                <a key={key} href={url} /* ... */ > {/* Keep link attributes */}
+                <a
+                  key={key}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-1 text-sm px-3 py-1 bg-primary/10 hover:bg-primary/20 rounded-md transition-colors"
+                >
                   <Download className="h-4 w-4" />
                   <span>{key.replace(/^\w/, c => c.toUpperCase())}</span>
                 </a>
@@ -187,11 +224,38 @@ export default function ResultsDisplay({ results }) {
            </div>
          )}
 
-        {/* Issues Statistics */}
-        {/* ... (keep statistics section as is) ... */}
-         <div className="grid grid-cols-3 gap-4">
-            {results.statistics && typeof results.statistics === 'object' ? (/* ... */) : (/* ... */)}
-         </div>
+        {/* --- Issues Statistics (Corrected Ternary) --- */}
+        <div className="grid grid-cols-3 gap-4">
+          {results.statistics && typeof results.statistics === 'object' ? (
+            // *** TRUE Branch: Render the statistics blocks ***
+            <>
+              <div className="border rounded-lg p-4 text-center space-y-1 bg-red-50/50">
+                <span className="text-3xl font-bold text-destructive">
+                  {results.statistics.critical ?? 0}
+                </span>
+                <p className="text-sm text-muted-foreground">Critical Issues</p>
+              </div>
+              <div className="border rounded-lg p-4 text-center space-y-1 bg-yellow-50/50">
+                <span className="text-3xl font-bold text-yellow-500">
+                  {results.statistics.major ?? 0}
+                </span>
+                <p className="text-sm text-muted-foreground">Major Issues</p>
+              </div>
+              <div className="border rounded-lg p-4 text-center space-y-1 bg-blue-50/50">
+                <span className="text-3xl font-bold text-blue-500">
+                  {results.statistics.minor ?? 0}
+                </span>
+                <p className="text-sm text-muted-foreground">Minor Issues</p>
+              </div>
+            </>
+          ) : (
+            // *** FALSE Branch: Render the fallback message ***
+             <div className="col-span-3 text-center text-muted-foreground text-sm p-4 border rounded-lg">
+                 Issue statistics not available.
+             </div>
+          )}
+        </div>
+        {/* --- End Issues Statistics --- */}
 
 
         {/* Abstract Analysis */}
@@ -199,10 +263,17 @@ export default function ResultsDisplay({ results }) {
            <div className="border rounded-lg overflow-hidden">
              <div className="bg-muted/30 px-4 py-2 font-medium">Abstract</div>
              <div className="p-4 space-y-4">
-               {/* ... (abstract text and summary) ... */}
-               {results.abstract.text && <p className="text-sm italic ...">{results.abstract.text}</p>}
-               {results.abstract.summary && <div className="space-y-1">...</div>}
-
+               {results.abstract.text && (
+                 <p className="text-sm italic border-l-4 border-muted pl-4 py-2 bg-muted/10 rounded">
+                   {results.abstract.text}
+                 </p>
+               )}
+               {results.abstract.summary && (
+                  <div className="space-y-1">
+                    <p className="font-medium text-sm">Summary:</p>
+                    <p className="text-sm">{results.abstract.summary}</p>
+                  </div>
+               )}
                {results.abstract.issues && Array.isArray(results.abstract.issues) && results.abstract.issues.length > 0 && (
                  <div className="space-y-2 pt-2">
                    <p className="font-medium text-sm">Issues Found:</p>
@@ -235,17 +306,36 @@ export default function ResultsDisplay({ results }) {
                   {section.paragraphs.map((paragraph, paragraphIndex) => (
                     paragraph && typeof paragraph === 'object' && paragraph.text && (
                       <div key={paragraphIndex} className="p-4 space-y-3">
-                         {/* ... (paragraph header, text, summary) ... */}
-                         <div className="flex items-center space-x-2 mb-1">...</div>
-                         <div className="text-sm leading-relaxed pl-6">{paragraph.text}</div>
-                         {paragraph.summary && <div className="pl-6">...</div>}
+                         <div className="flex items-center space-x-2 mb-1">
+                           <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                           <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Paragraph {paragraphIndex + 1}</p>
+                         </div>
 
-                         {/* ... (Paragraph Structure Checks - keep as is) ... */}
-                          {paragraph.evaluations && typeof paragraph.evaluations === 'object' && (
-                             <div className="pl-6 pt-2"> ... </div>
-                          )}
+                         <div className="text-sm leading-relaxed pl-6">
+                           {paragraph.text}
+                         </div>
 
-                        {/* Paragraph Issues */}
+                         {paragraph.summary && (
+                           <div className="pl-6">
+                              <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-1">Summary:</p>
+                              <p className="text-sm italic text-muted-foreground">{paragraph.summary}</p>
+                           </div>
+                         )}
+
+                         {paragraph.evaluations && typeof paragraph.evaluations === 'object' && (
+                            <div className="pl-6 pt-2">
+                              <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Structure Assessment:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {/* ... structure assessment tags ... */}
+                                 <div className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${ paragraph.evaluations.cccStructure ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }`}>C-C-C Structure: {paragraph.evaluations.cccStructure ? '✓' : '✗'}</div>
+                                 <div className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${ paragraph.evaluations.sentenceQuality ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }`}>Sentence Quality: {paragraph.evaluations.sentenceQuality ? '✓' : '✗'}</div>
+                                 <div className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${ paragraph.evaluations.topicContinuity ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }`}>Topic Continuity: {paragraph.evaluations.topicContinuity ? '✓' : '✗'}</div>
+                                 <div className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${ paragraph.evaluations.terminologyConsistency ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }`}>Terminology: {paragraph.evaluations.terminologyConsistency ? '✓' : '✗'}</div>
+                                 <div className={`inline-flex items-center text-xs px-2 py-1 rounded-full ${ paragraph.evaluations.structuralParallelism ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }`}>Parallelism: {paragraph.evaluations.structuralParallelism ? '✓' : '✗'}</div>
+                              </div>
+                            </div>
+                         )}
+
                          {paragraph.issues && Array.isArray(paragraph.issues) && paragraph.issues.length > 0 && (
                            <div className="pl-6 pt-2">
                              <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Issues Found:</p>
@@ -274,5 +364,5 @@ export default function ResultsDisplay({ results }) {
          ))}
       </div>
     </div>
-  )
+  );
 }
