@@ -5,6 +5,15 @@ import path from 'path'
 // Using absolute path with @ alias
 import { readFile } from '@/services/StorageService.js';
 
+// Safe console logging that won't break the API
+const safeLog = (prefix, message) => {
+  try {
+    console.log(`[API /download] ${prefix}: ${typeof message === 'object' ? JSON.stringify(message).substring(0, 200) + '...' : message}`);
+  } catch (error) {
+    console.log(`[API /download] Error logging ${prefix}`);
+  }
+};
+
 /**
  * Download a file from storage
  * @param {Request} request - The request object
@@ -16,7 +25,7 @@ export async function GET(request) {
     // Get file path from query parameters
     const { searchParams } = new URL(request.url);
     const filePath = searchParams.get('path');
-    console.log(`[API /download] Requested file path: ${filePath}`);
+    safeLog('requested-file-path', filePath);
 
     if (!filePath) {
       console.error('[API /download] Error: No file path provided.');
@@ -28,73 +37,102 @@ export async function GET(request) {
 
     // Prevent path traversal attacks
     const normalizedPath = path.normalize(filePath);
-    // Ensure TEMP_DIR is defined consistently (consider using constants.js or env)
-    const tempDir = path.normalize(process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp'));
-    console.log(`[API /download] Normalized path: ${normalizedPath}`);
-    console.log(`[API /download] Temp directory: ${tempDir}`);
+    // Use /tmp in production environment for Vercel
+    const tempDir = process.env.NODE_ENV === 'production'
+      ? '/tmp'
+      : (process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp'));
+    
+    safeLog('normalized-path', normalizedPath);
+    safeLog('temp-directory', tempDir);
 
-
-    // Security Check: Ensure the normalized path starts with the temp directory
-    // Use path.resolve to get absolute paths for comparison
-    const resolvedPath = path.resolve(normalizedPath);
-    const resolvedTempDir = path.resolve(tempDir);
-    if (!resolvedPath.startsWith(resolvedTempDir)) {
-       console.error(`[API /download] Forbidden: Invalid file path. Path ${resolvedPath} is outside of ${resolvedTempDir}`);
+    // Security Check: Ensure the normalized path is within the temp directory
+    // Special handling for Vercel environment
+    const isPathSafe = normalizedPath.startsWith(tempDir) || 
+                      (process.env.NODE_ENV === 'production' && normalizedPath.startsWith('/tmp'));
+                      
+    if (!isPathSafe) {
+       console.error(`[API /download] Forbidden: Invalid file path outside temp directory`);
       return NextResponse.json(
         { error: 'Invalid file path' },
         { status: 403 }
       );
     }
-     console.log(`[API /download] Path validation passed.`);
+    safeLog('path-validation', 'Passed security check');
 
-    // Check if file exists using fs.promises for async
+    // Check if file exists using try/catch
     try {
+        // Try to directly access file to see if it exists
         await fs.promises.access(normalizedPath, fs.constants.F_OK);
-         console.log(`[API /download] File exists at path: ${normalizedPath}`);
+        safeLog('file-exists', 'File exists, proceeding with download');
     } catch (err) {
-         console.error(`[API /download] Error: File not found at path: ${normalizedPath}`);
-         return NextResponse.json(
-             { error: 'File not found' },
-             { status: 404 }
-         );
+        // If not found in specified location, try with /tmp as fallback in production
+        if (process.env.NODE_ENV === 'production' && !normalizedPath.startsWith('/tmp')) {
+          const tmpFallbackPath = path.join('/tmp', path.basename(normalizedPath));
+          safeLog('file-not-found-trying-fallback', tmpFallbackPath);
+          
+          try {
+            await fs.promises.access(tmpFallbackPath, fs.constants.F_OK);
+            // If found in fallback location, use that path
+            safeLog('fallback-file-exists', 'Using fallback path');
+            normalizedPath = tmpFallbackPath;
+          } catch (fallbackErr) {
+            // Neither original nor fallback exists
+            console.error(`[API /download] Error: File not found in any location`);
+            return NextResponse.json(
+                { error: 'File not found' },
+                { status: 404 }
+            );
+          }
+        } else {
+          // No fallback to try, file doesn't exist
+          console.error(`[API /download] Error: File not found at path: ${normalizedPath}`);
+          return NextResponse.json(
+              { error: 'File not found' },
+              { status: 404 }
+          );
+        }
     }
 
-
     // Get file data using StorageService's readFile
-    console.log(`[API /download] Reading file data...`);
-    const fileData = await readFile(normalizedPath); // Use the imported readFile
-    console.log(`[API /download] File data read successfully. Size: ${fileData.length}`);
+    safeLog('reading-file', 'Starting file read operation');
+    
+    let fileData;
+    try {
+      fileData = await readFile(normalizedPath);
+      safeLog('file-read-success', `File read: ${fileData.length} bytes`);
+    } catch (readError) {
+      // Try direct filesystem read as fallback if the service fails
+      safeLog('service-read-failed', 'Falling back to direct filesystem read');
+      fileData = await fs.promises.readFile(normalizedPath);
+    }
 
     // Determine content type
     const extension = path.extname(normalizedPath).toLowerCase();
     let contentType = 'application/octet-stream'; // Default
 
-    // Common MIME types (add more if needed)
+    // Common MIME types
     const mimeTypes = {
         '.json': 'application/json',
         '.md': 'text/markdown; charset=utf-8',
         '.txt': 'text/plain; charset=utf-8',
         '.pdf': 'application/pdf',
         '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        // Add other types your app might generate/store
     };
 
     contentType = mimeTypes[extension] || contentType;
-    console.log(`[API /download] Determined Content-Type: ${contentType}`);
+    safeLog('content-type', contentType);
 
     // Get filename from path for Content-Disposition
     const filename = path.basename(normalizedPath);
-    console.log(`[API /download] Setting filename for download: ${filename}`);
+    safeLog('download-filename', filename);
 
     // Create and return the response
-     console.log(`[API /download] Sending file response.`);
+    safeLog('sending-response', 'Returning file download response');
     return new Response(fileData, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        // Use attachment to force download, inline might try to display
         'Content-Disposition': `attachment; filename="${filename}"`,
-        // Prevent caching of the download
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
