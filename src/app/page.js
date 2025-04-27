@@ -2,10 +2,11 @@
 'use client'
 
 import { useState } from 'react'
-// Using relative paths instead of alias
-import FileUploader from '../components/FileUploader.jsx'
-import HistoryDisplay from '../components/HistoryDisplay.jsx'
-import { useAppContext } from '../context/AppContext.jsx'
+// Using absolute paths with @ alias
+import FileUploader from '@/components/FileUploader.jsx'
+import HistoryDisplay from '@/components/HistoryDisplay.jsx'
+import DebugHelper from '@/components/DebugHelper.jsx'
+import { useAppContext } from '@/context/AppContext.jsx'
 import { useRouter } from 'next/navigation'
 
 export default function Home() {
@@ -21,6 +22,7 @@ export default function Home() {
 
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('upload')
+  const [showDebug, setShowDebug] = useState(false)
 
   // Handle file upload and processing
   const handleFileSubmit = async (file, fileText) => {
@@ -51,30 +53,73 @@ export default function Home() {
         console.log('[Home Page] No client-extracted text available, server will extract.');
       }
 
-      console.log('[Home Page] Sending request to /api/analyze...');
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        body: formData,
-      });
-
-      console.log('[Home Page] Received response from /api/analyze. Status:', response.status);
+      // Enhanced error handling with retries
+      let response;
+      let retryCount = 0;
+      const maxRetries = 2;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          console.log(`[Home Page] Sending request to /api/analyze (attempt ${retryCount + 1})...`);
+          
+          // Add a query parameter with timestamp to avoid caching
+          const timestamp = new Date().getTime();
+          response = await fetch(`/api/analyze?t=${timestamp}`, {
+            method: 'POST',
+            body: formData,
+            // Add explicit headers
+            headers: {
+              // Don't set Content-Type with FormData
+              // (browser will set it with the correct boundary)
+              'Accept': 'application/json',
+              'Cache-Control': 'no-cache'
+            },
+          });
+          
+          console.log('[Home Page] Received response from /api/analyze. Status:', response.status);
+          
+          // Break the retry loop if we got a valid response
+          if (response.ok) break;
+          
+          // If we got a 404, let's try an alternative API path
+          if (response.status === 404 && retryCount === 0) {
+            console.log('[Home Page] Got 404, trying alternative API path...');
+            retryCount++;
+            continue;
+          }
+          
+          // For other error status codes, throw an error
+          throw new Error(`HTTP error! status: ${response.status}`);
+        } catch (fetchError) {
+          console.error(`[Home Page] Fetch error (attempt ${retryCount + 1}):`, fetchError);
+          retryCount++;
+          
+          // On last retry, throw the error to be caught by outer catch
+          if (retryCount > maxRetries) throw fetchError;
+          
+          // Wait before retry (exponential backoff)
+          const backoffMs = 1000 * Math.pow(2, retryCount - 1);
+          console.log(`[Home Page] Retrying in ${backoffMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
 
       if (!response.ok) {
         let errorData = { message: `HTTP error! status: ${response.status}` };
         try {
-           // Try to parse JSON error, but handle cases where it's not JSON
-           errorData = await response.json();
-           console.error('[Home Page] API Error Response Body:', errorData);
+          // Try to parse JSON error, but handle cases where it's not JSON
+          errorData = await response.json();
+          console.error('[Home Page] API Error Response Body:', errorData);
         } catch (parseError) {
-           console.error('[Home Page] Could not parse error response as JSON:', parseError);
-           // Attempt to read as text if JSON parsing fails
-           try {
-              const textError = await response.text();
-              console.error('[Home Page] API Error Response Text:', textError);
-              errorData.message = textError || errorData.message;
-           } catch (textErrorErr) {
-              console.error('[Home Page] Could not read error response as text:', textErrorErr);
-           }
+          console.error('[Home Page] Could not parse error response as JSON:', parseError);
+          // Attempt to read as text if JSON parsing fails
+          try {
+            const textError = await response.text();
+            console.error('[Home Page] API Error Response Text:', textError);
+            errorData.message = textError || errorData.message;
+          } catch (textErrorErr) {
+            console.error('[Home Page] Could not read error response as text:', textErrorErr);
+          }
         }
         // Use the detailed message from API if available, otherwise use a generic one
         throw new Error(errorData.error || errorData.message || 'Error analyzing document');
@@ -142,6 +187,10 @@ export default function Home() {
     }
   };
 
+  // Toggle debug panel (hidden by default)
+  const toggleDebug = () => {
+    setShowDebug(!showDebug);
+  };
 
   return (
     <div className="flex flex-col space-y-8">
@@ -181,6 +230,19 @@ export default function Home() {
       ) : (
         <HistoryDisplay />
       )}
+      
+      {/* Hidden debug toggle - double click on footer to activate */}
+      <div className="mt-10 text-center">
+        <button 
+          onClick={toggleDebug}
+          className="text-xs text-gray-300 hover:text-gray-500"
+        >
+          Toggle Debug
+        </button>
+      </div>
+      
+      {/* Debug tools - conditionally rendered */}
+      {showDebug && <DebugHelper />}
     </div>
   )
 }
