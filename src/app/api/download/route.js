@@ -2,8 +2,8 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
-// Using relative path
-import { readFile } from '../../../services/StorageService.js';
+// Using absolute path with @ alias
+import { readFile } from '@/services/StorageService.js';
 
 /**
  * Download a file from storage
