@@ -1,3 +1,6 @@
+export const maxDuration = 300; // 5 minutes timeout
+
+
 // File Path: src/app/api/analyze/route.js
 import { NextResponse } from 'next/server';
 import fs from 'fs';
