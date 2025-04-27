@@ -11,10 +11,19 @@ const unlinkAsync = promisify(fs.unlink);
 const accessAsync = fs.promises ? fs.promises.access : promisify(fs.access); // Prefer fs.promises
 const readdirAsync = fs.promises ? fs.promises.readdir : promisify(fs.readdir); // Prefer fs.promises
 
-// Get temp directory from environment or use default relative to project root
+// Get temp directory - critically important to use /tmp in Vercel serverless environment
 const TEMP_DIR = process.env.NODE_ENV === 'production'
   ? '/tmp'
   : (process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp'));
+
+// Safe console logging that won't break in production
+const safeLog = (prefix, message) => {
+  try {
+    console.log(`[StorageService] ${prefix}: ${typeof message === 'object' ? JSON.stringify(message).substring(0, 200) + '...' : message}`);
+  } catch (error) {
+    console.log(`[StorageService] Error logging ${prefix}`);
+  }
+};
 
 /**
  * Initialize storage - ensure temp directory exists
@@ -25,13 +34,13 @@ export const initStorage = async () => {
      // Check existence using fs.promises.access
      try {
          await accessAsync(TEMP_DIR, fs.constants.F_OK);
-         console.log(`[StorageService] Temp directory already exists: ${TEMP_DIR}`);
+         safeLog('initStorage', `Temp directory already exists: ${TEMP_DIR}`);
      } catch (err) {
           // If error code is ENOENT (Not Found), create the directory
           if (err.code === 'ENOENT') {
-              console.log(`[StorageService] Temp directory not found, creating: ${TEMP_DIR}`);
+              safeLog('initStorage', `Temp directory not found, creating: ${TEMP_DIR}`);
               await mkdirAsync(TEMP_DIR, { recursive: true });
-              console.log(`[StorageService] Temp directory created successfully.`);
+              safeLog('initStorage', `Temp directory created successfully.`);
           } else {
               // Rethrow other errors (e.g., permission issues)
               throw err;
@@ -39,7 +48,8 @@ export const initStorage = async () => {
      }
   } catch (error) {
     console.error('[StorageService] Error initializing storage:', error);
-    throw new Error('Failed to initialize storage directory');
+    // Don't throw - allow the process to continue even if directory creation fails
+    safeLog('initStorage', 'Continuing without storage directory');
   }
 };
 
@@ -57,16 +67,17 @@ export const saveFile = async (data, filename, submissionId) => {
     // Generate a safe filename to prevent path traversal and conflicts
     const safeFilename = `${submissionId}-${Date.now()}-${path.basename(filename).replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const filePath = path.join(TEMP_DIR, safeFilename);
-    console.log(`[StorageService] Saving file to path: ${filePath}`);
+    safeLog('saveFile', `Saving file to path: ${filePath}`);
 
     // Write file
     await writeFileAsync(filePath, data);
-    console.log(`[StorageService] File saved successfully.`);
+    safeLog('saveFile', `File saved successfully.`);
 
     return filePath;
   } catch (error) {
     console.error('[StorageService] Error saving file:', error);
-    throw new Error('Failed to save file');
+    // Return null instead of throwing - let caller decide how to handle
+    return null;
   }
 };
 
@@ -82,16 +93,17 @@ export const saveResults = async (results, submissionId) => {
 
     const filename = `results-${submissionId}.json`;
     const filePath = path.join(TEMP_DIR, filename);
-    console.log(`[StorageService] Saving results JSON to path: ${filePath}`);
+    safeLog('saveResults', `Saving results JSON to path: ${filePath}`);
 
     // Write results as JSON string
     await writeFileAsync(filePath, JSON.stringify(results, null, 2)); // Pretty print JSON
-    console.log(`[StorageService] Results JSON saved successfully.`);
+    safeLog('saveResults', `Results JSON saved successfully.`);
 
     return filePath;
   } catch (error) {
     console.error('[StorageService] Error saving results JSON:', error);
-    throw new Error('Failed to save analysis results');
+    // Return null instead of throwing - let caller decide how to handle
+    return null;
   }
 };
 
@@ -107,12 +119,12 @@ export const generateSummaryReport = async (results, submissionId) => {
 
     const filename = `report-${submissionId}.md`;
     const filePath = path.join(TEMP_DIR, filename);
-    console.log(`[StorageService] Generating summary report at path: ${filePath}`);
+    safeLog('generateSummaryReport', `Generating summary report at path: ${filePath}`);
 
     // Basic check for results structure
     if (!results || typeof results !== 'object') {
         console.error('[StorageService] Cannot generate report: Invalid results object provided.');
-        throw new Error('Invalid results data for report generation.');
+        return null;
     }
 
     // --- Report Generation Logic ---
@@ -250,12 +262,13 @@ export const generateSummaryReport = async (results, submissionId) => {
 
     // Write report to file
     await writeFileAsync(filePath, report);
-    console.log(`[StorageService] Summary report generated successfully.`);
+    safeLog('generateSummaryReport', `Summary report generated successfully.`);
 
     return filePath;
   } catch (error) {
     console.error('[StorageService] Error generating summary report:', error);
-    throw new Error('Failed to generate summary report');
+    // Return null instead of throwing - let caller decide how to handle
+    return null;
   }
 };
 
@@ -267,13 +280,13 @@ export const generateSummaryReport = async (results, submissionId) => {
  */
 export const readFile = async (filePath) => {
   try {
-     console.log(`[StorageService] Reading file from path: ${filePath}`);
+     safeLog('readFile', `Reading file from path: ${filePath}`);
     // Basic check to ensure path seems plausible before reading
      if (!filePath || typeof filePath !== 'string') {
          throw new Error('Invalid file path provided for reading.');
      }
     const data = await readFileAsync(filePath);
-     console.log(`[StorageService] File read successfully. Size: ${data.length}`);
+     safeLog('readFile', `File read successfully. Size: ${data.length}`);
     return data;
   } catch (error) {
     console.error('[StorageService] Error reading file:', filePath, error);
@@ -289,17 +302,17 @@ export const readFile = async (filePath) => {
  */
 export const deleteFile = async (filePath) => {
   try {
-     console.log(`[StorageService] Attempting to delete file: ${filePath}`);
+     safeLog('deleteFile', `Attempting to delete file: ${filePath}`);
      // Use fs.promises.access to check existence first
       try {
           await accessAsync(filePath, fs.constants.F_OK);
           // File exists, proceed with deletion
           await unlinkAsync(filePath);
-          console.log(`[StorageService] Successfully deleted file: ${filePath}`);
+          safeLog('deleteFile', `Successfully deleted file: ${filePath}`);
       } catch (err) {
            // If file doesn't exist (ENOENT), log it but don't throw an error
            if (err.code === 'ENOENT') {
-               console.log(`[StorageService] File not found, skipping deletion: ${filePath}`);
+               safeLog('deleteFile', `File not found, skipping deletion: ${filePath}`);
            } else {
                // For other errors (like permissions), re-throw
                throw err;
@@ -318,18 +331,18 @@ export const deleteFile = async (filePath) => {
  */
 export const scheduleCleanup = (submissionId) => {
     const CLEANUP_DELAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-    console.log(`[StorageService] Scheduling cleanup for submission ID: ${submissionId} in ${CLEANUP_DELAY / 1000 / 3600} hours.`);
+    safeLog('scheduleCleanup', `Scheduling cleanup for submission ID: ${submissionId} in ${CLEANUP_DELAY / 1000 / 3600} hours.`);
 
   // Schedule deletion
   setTimeout(async () => {
-    console.log(`[StorageService] Starting cleanup for submission ID: ${submissionId}`);
+    safeLog('scheduleCleanup', `Starting cleanup for submission ID: ${submissionId}`);
     try {
        await initStorage(); // Ensure temp dir exists before reading it
       const files = await readdirAsync(TEMP_DIR);
 
       // Find all files matching this submission ID prefix
       const matchingFiles = files.filter(file => file.startsWith(submissionId));
-       console.log(`[StorageService] Found ${matchingFiles.length} files matching ${submissionId} for cleanup.`);
+       safeLog('scheduleCleanup', `Found ${matchingFiles.length} files matching ${submissionId} for cleanup.`);
 
       // Delete each matching file
       const deletePromises = matchingFiles.map(file =>
@@ -338,7 +351,7 @@ export const scheduleCleanup = (submissionId) => {
 
       await Promise.all(deletePromises); // Wait for all deletions
 
-      console.log(`[StorageService] Completed cleanup for submission ${submissionId}`);
+      safeLog('scheduleCleanup', `Completed cleanup for submission ${submissionId}`);
     } catch (error) {
       // Log errors during the cleanup process itself
       console.error(`[StorageService] Error during scheduled cleanup for ${submissionId}:`, error);
