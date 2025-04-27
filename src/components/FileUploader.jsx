@@ -31,7 +31,7 @@ const mnkPaper = {
 };
 
 export default function FileUploader({ onFileSubmit, isProcessing }) {
-  const { setIsProcessing, setError } = useAppContext();
+  const { setIsProcessing, setError } = useAppContext(); // Assuming setIsProcessing is still needed if passed down
   const [file, setFile] = useState(null);
   const [fileText, setFileText] = useState(''); // Store extracted text
   const maxSize = 10 * 1024 * 1024; // 10MB max file size
@@ -97,8 +97,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
     } catch (err) {
       console.warn('[FileUploader] Could not extract text client-side, will process on server:', err);
     }
-  // Added missing dependency array closer ']', removed setError dependency as it comes from context and is stable
-  }, [setError, maxSize]);
+  }, [setError, maxSize]); // Keep dependencies minimal
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -113,30 +112,59 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         return;
     }
     console.log('[FileUploader] handleSubmit called for file:', file.name);
-    // NOTE: setIsProcessing and setError are now handled within handleFileSubmit in page.js
-    // If this component needs to manage its own processing state distinct from the page,
-    // you might need to pass down callbacks or adjust state management.
-    // For now, assuming the page's isProcessing prop handles the button state.
-
     try {
         await onFileSubmit(file, fileText); // Call the handler passed from the page
         console.log('[FileUploader] Handed off file to onFileSubmit');
-        // Reset local state after successful handoff (optional)
-        // setFile(null);
-        // setFileText('');
     } catch (err) {
-        // Errors should ideally be caught and handled in the onFileSubmit function (in page.js)
-        // But we can log here if needed.
         console.error('[FileUploader] Error calling onFileSubmit:', err);
-        // Optionally set a local error state if needed: setError(err.message || 'Error submitting file.');
     } finally {
        console.log('[FileUploader] handleSubmit finished.');
-       // Resetting processing state is likely handled in page.js's finally block
     }
   };
 
   return (
     <div className="space-y-6">
+
+      {/* --- MnK Paper Summary Section (Now first) --- */}
+      <div className="text-left p-6 border rounded-lg bg-muted/10 space-y-4">
+          <div className="flex items-center space-x-2">
+              <Info className="h-6 w-6 text-primary/80" />
+              <h3 className="text-lg font-semibold">Based on "Ten Simple Rules for Structuring Papers"</h3>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            This tool analyzes your scientific paper's structure based on the principles outlined in the highly influential paper
+            by <span className='font-medium'>{mnkPaper.authors}</span> (<span className='italic'>{mnkPaper.journal}, {mnkPaper.year}</span>),
+            which has been {mnkPaper.popularity}. The goal is to help you communicate your work clearly and effectively.
+          </p>
+          <div className="text-sm">
+              <p className="font-medium mb-1">The 10 Rules (MnK):</p>
+              <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-xs">
+                  {mnkPaper.rules.map((rule, index) => (
+                      <li key={index}>{rule}</li>
+                  ))}
+              </ol>
+          </div>
+          <p className='text-sm text-muted-foreground'>
+              Feedback provided by this tool will often reference these rules using the notation <span className='font-mono bg-muted px-1 py-0.5 rounded'>MnK$</span>,
+              where <span className='font-mono bg-muted px-1 py-0.5 rounded'>$</span> is the original rule number (e.g., <span className='font-mono bg-muted px-1 py-0.5 rounded'>MnK3</span> refers to Rule 3: C-C-C Scheme).
+              You'll be able to mouse over these tags in the results for the full rule title.
+          </p>
+          <div>
+              <a
+                href={mnkPaper.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-1 text-sm text-primary hover:underline"
+              >
+                <span>Read the full paper</span>
+                <ExternalLink className="h-4 w-4" />
+              </a>
+          </div>
+      </div>
+      {/* --- End MnK Paper Summary Section --- */}
+
+
+      {/* --- File Dropzone Section (Now second) --- */}
       <div
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors
@@ -162,7 +190,11 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
           </div>
         </div>
       </div>
+      {/* --- End File Dropzone Section --- */}
 
+
+      {/* --- Selected File Info & Submit Button Section (Now last) --- */}
+      {/* This section only appears *after* a file is selected */}
       {file && (
         <div className="border rounded-lg p-4 space-y-4">
           <div className="flex items-center space-x-3">
@@ -188,47 +220,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
           </div>
         </div>
       )}
-
-      {/* --- Updated 'About' Section --- */}
-      {!file && (
-        <div className="text-left p-6 border rounded-lg bg-muted/10 space-y-4">
-           <div className="flex items-center space-x-2">
-               <Info className="h-6 w-6 text-primary/80" />
-               <h3 className="text-lg font-semibold">Based on "Ten Simple Rules for Structuring Papers"</h3>
-           </div>
-           <p className="text-sm text-muted-foreground">
-              This tool analyzes your scientific paper's structure based on the principles outlined in the highly influential paper
-              by <span className='font-medium'>{mnkPaper.authors}</span> (<span className='italic'>{mnkPaper.journal}, {mnkPaper.year}</span>),
-              which has been {mnkPaper.popularity}. The goal is to help you communicate your work clearly and effectively.
-           </p>
-            <div className="text-sm">
-               <p className="font-medium mb-1">The 10 Rules (MnK):</p>
-                <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-xs">
-                   {mnkPaper.rules.map((rule, index) => (
-                       <li key={index}>{rule}</li>
-                   ))}
-                </ol>
-            </div>
-            <p className='text-sm text-muted-foreground'>
-                Feedback provided by this tool will often reference these rules using the notation <span className='font-mono bg-muted px-1 py-0.5 rounded'>MnK$</span>,
-                where <span className='font-mono bg-muted px-1 py-0.5 rounded'>$</span> is the original rule number (e.g., <span className='font-mono bg-muted px-1 py-0.5 rounded'>MnK3</span> refers to Rule 3: C-C-C Scheme).
-                You'll be able to mouse over these tags in the results for the full rule title.
-            </p>
-           <div>
-               <a
-                  href={mnkPaper.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center space-x-1 text-sm text-primary hover:underline"
-               >
-                  <span>Read the full paper</span>
-                  <ExternalLink className="h-4 w-4" />
-               </a>
-           </div>
-
-        </div>
-      )}
-      {/* --- End Updated 'About' Section --- */}
+       {/* --- End Selected File Info & Submit Button Section --- */}
 
     </div>
   )
