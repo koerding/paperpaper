@@ -177,7 +177,7 @@ Respond ONLY with the JSON object.`
     }
     
     // Process sections, evaluating paragraphs in batches
-    const batchSize = 50; // Process 5 paragraphs at a time
+    const batchSize = 50; // Process up to 50 paragraphs at a time
     const evaluatedSections = [];
     
     for (const section of sections) {
@@ -201,7 +201,7 @@ ${rulesPrompt}
 
 For each paragraph, analyze:
 - Context-Content-Conclusion structure
-- Sentence quality 
+- Sentence quality (length under 25 words on average)
 - Topic continuity
 - Terminology consistency
 - Structural parallelism
@@ -479,7 +479,7 @@ export async function analyzeDocumentStructure(document, rawText) {
             return severityOrder[a.severity] - severityOrder[b.severity];
         });
         
-        // Create final results
+        // Create final results - without prioritized issues list
         const finalResults = {
             title: evaluationResult.title,
             abstract: evaluationResult.abstract,
@@ -491,7 +491,7 @@ export async function analyzeDocumentStructure(document, rawText) {
                 major: majorCount, 
                 minor: minorCount 
             },
-            prioritizedIssues: prioritizedIssues,
+            // Removed prioritizedIssues as requested
             sections: evaluationResult.sections
         };
         
