@@ -1,5 +1,5 @@
 // File Path: src/app/layout.js
-import './global.css' // Path confirmed correct by ls -R
+import '../global.css' // Path confirmed correct by ls -R
 import { Inter } from 'next/font/google'
 // Using relative path
 import { AppProvider } from '../context/AppContext.jsx'
