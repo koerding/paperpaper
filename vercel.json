@@ -1,7 +1,6 @@
 {
-  "version": 2,
   "functions": {
-    "**/*.{js,jsx,ts,tsx}": {
+    "app/api/**/*": {
       "maxDuration": 300
     }
   }
