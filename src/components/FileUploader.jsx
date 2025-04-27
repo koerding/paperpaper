@@ -4,9 +4,9 @@
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Cloud, FileText, AlertCircle } from 'lucide-react'
-// Using relative paths for imports from other src subdirectories
-import { useAppContext } from '../context/AppContext.jsx'
-import { extractTextFromFile } from '../services/ProcessingService.client.js'
+// Using absolute paths with @ alias
+import { useAppContext } from '@/context/AppContext.jsx'
+import { extractTextFromFile } from '@/services/ProcessingService.client.js'
 
 export default function FileUploader({ onFileSubmit, isProcessing }) {
   const { setIsProcessing, setError } = useAppContext()
@@ -100,12 +100,37 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
     setError(null); // Clear previous errors before submitting
 
     try {
-      // Pass the file object and the potentially extracted text
-      await onFileSubmit(file, fileText);
-      console.log('[FileUploader] onFileSubmit completed successfully.');
+      // Enhanced error handling with retries
+      let retryCount = 0;
+      const maxRetries = 2;
+      
+      while (retryCount <= maxRetries) {
+        try {
+          console.log(`[FileUploader] Attempt ${retryCount + 1} to submit file...`);
+          
+          // Add a timestamp parameter to avoid potential caching issues
+          const timestamp = new Date().getTime();
+          await onFileSubmit(file, fileText);
+          
+          console.log('[FileUploader] File submitted successfully');
+          // If we reach here, the submission was successful - break the retry loop
+          break;
+        } catch (submitError) {
+          console.error(`[FileUploader] Error on attempt ${retryCount + 1}:`, submitError);
+          retryCount++;
+          
+          // On last retry, throw the error to be caught by outer catch
+          if (retryCount > maxRetries) throw submitError;
+          
+          // Wait before retry (exponential backoff)
+          const backoffMs = 1000 * Math.pow(2, retryCount - 1);
+          console.log(`[FileUploader] Retrying in ${backoffMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+        }
+      }
     } catch (err) {
-      // This catch is primarily for errors thrown by onFileSubmit itself (e.g., network issues)
-      console.error('[FileUploader] Error during onFileSubmit:', err);
+      // This catch is for errors that persist after all retries
+      console.error('[FileUploader] All retries failed. Error during onFileSubmit:', err);
       setError(err.message || 'Error submitting file for analysis.');
     } finally {
       console.log('[FileUploader] handleSubmit finished.');
