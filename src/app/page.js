@@ -1,13 +1,13 @@
 // File Path: src/app/page.js
 'use client'
 
-import { useState } from 'react'
+import { useState } from 'react';
 // Using absolute paths with @ alias
-import FileUploader from '@/components/FileUploader.jsx'
-import HistoryDisplay from '@/components/HistoryDisplay.jsx'
-import DebugHelper from '@/components/DebugHelper.jsx'
-import { useAppContext } from '@/context/AppContext.jsx'
-import { useRouter } from 'next/navigation'
+import FileUploader from '@/components/FileUploader.jsx';
+import HistoryDisplay from '@/components/HistoryDisplay.jsx';
+import DebugHelper from '@/components/DebugHelper.jsx'; // Assuming DebugHelper is still used
+import { useAppContext } from '@/context/AppContext.jsx';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const {
@@ -18,170 +18,98 @@ export default function Home() {
     updateSubmissionResults,
     setIsProcessing,
     getSubmission // Added getSubmission to update status correctly on error
-  } = useAppContext()
+  } = useAppContext();
 
-  const router = useRouter()
-  const [activeTab, setActiveTab] = useState('upload')
-  const [showDebug, setShowDebug] = useState(false)
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState('upload');
+  const [showDebug, setShowDebug] = useState(false); // Assuming DebugHelper toggle exists
 
-  // Handle file upload and processing
+  // Function definition for handling file submission
   const handleFileSubmit = async (file, fileText) => {
-    console.log('[Home Page] handleFileSubmit triggered for file:', file.name);
-    setError(null); // Clear errors from previous attempts
-    setIsProcessing(true); // Ensure processing state is set
-
-    let submissionId; // Define submissionId here to access in finally block
+    console.log('[Home Page] handleFileSubmit triggered for file:', file?.name); // Added optional chaining
+    setError(null);
+    setIsProcessing(true);
+    let submissionId;
 
     try {
-      // Add submission to context immediately
+      console.log('[Home Page] Adding submission to context...');
       submissionId = addSubmission({
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type,
-        status: 'processing', // Initial status
+        status: 'processing',
       });
-      console.log('[Home Page] Added submission to context with ID:', submissionId);
+      console.log('[Home Page] Added submission ID:', submissionId);
 
-      // Prepare form data for API
       const formData = new FormData();
       formData.append('file', file);
-
       if (fileText) {
-        console.log('[Home Page] Appending client-extracted text to FormData.');
+        console.log('[Home Page] Appending client-extracted text.');
         formData.append('fileText', fileText);
-      } else {
-        console.log('[Home Page] No client-extracted text available, server will extract.');
       }
 
-      // Enhanced error handling with retries
-      let response;
-      let retryCount = 0;
-      const maxRetries = 2;
-      
-      while (retryCount <= maxRetries) {
-        try {
-          console.log(`[Home Page] Sending request to /api/analyze (attempt ${retryCount + 1})...`);
-          
-          // Add a query parameter with timestamp to avoid caching
-          const timestamp = new Date().getTime();
-          response = await fetch(`/api/analyze?t=${timestamp}`, {
-            method: 'POST',
-            body: formData,
-            // Add explicit headers
-            headers: {
-              // Don't set Content-Type with FormData
-              // (browser will set it with the correct boundary)
-              'Accept': 'application/json',
-              'Cache-Control': 'no-cache'
-            },
-          });
-          
-          console.log('[Home Page] Received response from /api/analyze. Status:', response.status);
-          
-          // Break the retry loop if we got a valid response
-          if (response.ok) break;
-          
-          // If we got a 404, let's try an alternative API path
-          if (response.status === 404 && retryCount === 0) {
-            console.log('[Home Page] Got 404, trying alternative API path...');
-            retryCount++;
-            continue;
-          }
-          
-          // For other error status codes, throw an error
-          throw new Error(`HTTP error! status: ${response.status}`);
-        } catch (fetchError) {
-          console.error(`[Home Page] Fetch error (attempt ${retryCount + 1}):`, fetchError);
-          retryCount++;
-          
-          // On last retry, throw the error to be caught by outer catch
-          if (retryCount > maxRetries) throw fetchError;
-          
-          // Wait before retry (exponential backoff)
-          const backoffMs = 1000 * Math.pow(2, retryCount - 1);
-          console.log(`[Home Page] Retrying in ${backoffMs}ms...`);
-          await new Promise(resolve => setTimeout(resolve, backoffMs));
-        }
-      }
+      console.log('[Home Page] Sending request to /api/analyze...');
+      // Add timestamp to avoid caching
+      const timestamp = new Date().getTime();
+      const response = await fetch(`/api/analyze?t=${timestamp}`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+      });
 
+      console.log('[Home Page] Received response status:', response.status);
       if (!response.ok) {
         let errorData = { message: `HTTP error! status: ${response.status}` };
         try {
-          // Try to parse JSON error, but handle cases where it's not JSON
           errorData = await response.json();
-          console.error('[Home Page] API Error Response Body:', errorData);
         } catch (parseError) {
-          console.error('[Home Page] Could not parse error response as JSON:', parseError);
-          // Attempt to read as text if JSON parsing fails
-          try {
-            const textError = await response.text();
-            console.error('[Home Page] API Error Response Text:', textError);
-            errorData.message = textError || errorData.message;
-          } catch (textErrorErr) {
-            console.error('[Home Page] Could not read error response as text:', textErrorErr);
-          }
+           try {
+              const textError = await response.text();
+              errorData.message = textError || errorData.message;
+           } catch(e){} // Ignore error reading text response if JSON parse failed
         }
-        // Use the detailed message from API if available, otherwise use a generic one
+        console.error('[Home Page] API Error:', errorData);
         throw new Error(errorData.error || errorData.message || 'Error analyzing document');
       }
 
       const results = await response.json();
-      console.log('[Home Page] Successfully parsed results from API for submission:', submissionId);
-      console.log('[Home Page] Results structure from API - top-level keys:', Object.keys(results));
+      console.log('[Home Page] Successfully parsed API results for:', submissionId);
 
-      // CRITICAL FIX: Instead of updating with properties from the results,
-      // we update the submission with a separate results property
       if (typeof updateSubmissionResults === 'function') {
-         // Get the existing submission
          const currentSubmission = getSubmission(submissionId);
-         
-         // Create an updated version with both status and the full results object
          const updatedSubmission = {
             ...currentSubmission,
             status: 'completed',
-            results: results  // Store the entire results object
+            results: results // Store the entire results object
          };
-         
-         console.log('[Home Page] Updating submission with data structure:', 
-           JSON.stringify({
-             id: submissionId,
-             status: 'completed',
-             hasResults: !!results,
-             resultKeys: Object.keys(results)
-           })
-         );
-         
-         // Update the submission in the context
+         console.log('[Home Page] Updating submission in context...');
          updateSubmissionResults(submissionId, updatedSubmission);
-         console.log('[Home Page] Updated submission in context with results.');
       } else {
-         console.error('[Home Page] updateSubmissionResults is not a function in context!');
+         console.error('[Home Page] updateSubmissionResults is not a function!');
       }
 
-      // Navigate to results page
-      console.log('[Home Page] Navigating to results page for submission:', submissionId);
+      console.log('[Home Page] Navigating to results page...');
       router.push(`/results?id=${submissionId}`);
 
     } catch (err) {
-      // This catches errors from fetch, response parsing, context updates, navigation
       console.error('[Home Page] Error processing file submission:', err);
-      setError(err.message || 'An unexpected error occurred during processing.');
-       // Optionally update submission status to 'error' if submissionId exists
+      setError(err.message || 'An unexpected error occurred.');
        if (submissionId && typeof updateSubmissionResults === 'function' && typeof getSubmission === 'function') {
-           const currentSubmission = getSubmission(submissionId); // Use getSubmission if available
-           // Ensure results object exists before trying to update, and set status to error
+           const currentSubmission = getSubmission(submissionId);
            const updatedSubmission = {
              ...currentSubmission,
              status: 'error',
              results: { error: err.message || 'Processing failed' }
            };
            updateSubmissionResults(submissionId, updatedSubmission);
-           console.log('[Home Page] Updated submission in context with error status.');
+           console.log('[Home Page] Updated submission to error status.');
        } else {
-           console.error('[Home Page] Could not update submission status to error; updateSubmissionResults or getSubmission missing from context?');
+            console.error('[Home Page] Could not update submission to error status.');
        }
     } finally {
-       // Ensure processing state is always reset
        console.log('[Home Page] handleFileSubmit finished.');
        setIsProcessing(false);
     }
@@ -192,25 +120,18 @@ export default function Home() {
     setShowDebug(!showDebug);
   };
 
+
   return (
     <div className="flex flex-col space-y-8">
       <div className="flex justify-center border-b">
         <button
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'upload'
-              ? 'border-b-2 border-primary'
-              : 'text-muted-foreground'
-          }`}
+          className={`px-4 py-2 font-medium ${ activeTab === 'upload' ? 'border-b-2 border-primary' : 'text-muted-foreground' }`}
           onClick={() => setActiveTab('upload')}
         >
           Upload Paper
         </button>
         <button
-          className={`px-4 py-2 font-medium ${
-            activeTab === 'history'
-              ? 'border-b-2 border-primary'
-              : 'text-muted-foreground'
-          }`}
+          className={`px-4 py-2 font-medium ${ activeTab === 'history' ? 'border-b-2 border-primary' : 'text-muted-foreground' }`}
           onClick={() => setActiveTab('history')}
         >
           Submission History
@@ -225,24 +146,24 @@ export default function Home() {
       )}
 
       {activeTab === 'upload' ? (
-        // Pass the updated handleFileSubmit
+        // Passing the handleFileSubmit function as the onFileSubmit prop
         <FileUploader onFileSubmit={handleFileSubmit} isProcessing={isProcessing} />
       ) : (
         <HistoryDisplay />
       )}
-      
-      {/* Hidden debug toggle - double click on footer to activate */}
-      <div className="mt-10 text-center">
-        <button 
-          onClick={toggleDebug}
-          className="text-xs text-gray-300 hover:text-gray-500"
-        >
-          Toggle Debug
-        </button>
-      </div>
-      
+
       {/* Debug tools - conditionally rendered */}
-      {showDebug && <DebugHelper />}
+      {showDebug && (
+         <>
+             <button onClick={toggleDebug} className="text-xs text-gray-500 hover:text-gray-700 self-center">Hide Debug</button>
+             <DebugHelper />
+         </>
+      )}
+       {!showDebug && (
+           <div className="mt-10 text-center">
+                <button onClick={toggleDebug} className="text-xs text-gray-300 hover:text-gray-500">Toggle Debug</button>
+           </div>
+       )}
     </div>
   )
 }
