@@ -12,7 +12,9 @@ const accessAsync = fs.promises ? fs.promises.access : promisify(fs.access); // 
 const readdirAsync = fs.promises ? fs.promises.readdir : promisify(fs.readdir); // Prefer fs.promises
 
 // Get temp directory from environment or use default relative to project root
-const TEMP_DIR = process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp');
+const TEMP_DIR = process.env.NODE_ENV === 'production'
+  ? '/tmp'
+  : (process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp'));
 
 /**
  * Initialize storage - ensure temp directory exists
