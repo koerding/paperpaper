@@ -1,13 +1,13 @@
 // File Path: src/app/api/upload/route.js
 import { NextResponse } from 'next/server';
-// Using relative paths
-import { validateFileType } from '../../../lib/utils.js';
+// Using absolute paths with @ alias
+import { validateFileType } from '@/lib/utils.js';
 import {
   SUPPORTED_MIME_TYPES,
   SUPPORTED_EXTENSIONS,
   MAX_FILE_SIZE
-} from '../../../lib/constants.js';
-import { saveFile } from '../../../services/StorageService.js';
+} from '@/lib/constants.js';
+import { saveFile } from '@/services/StorageService.js';
 
 /**
  * Process file upload (Note: This seems redundant if /api/analyze handles upload directly)
