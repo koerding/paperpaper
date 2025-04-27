@@ -201,7 +201,7 @@ ${rulesPrompt}
 
 For each paragraph, analyze:
 - Context-Content-Conclusion structure
-- Sentence quality (length under 25 words on average)
+- Sentence quality 
 - Topic continuity
 - Terminology consistency
 - Structural parallelism
