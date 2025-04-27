@@ -1,16 +1,22 @@
 // File Path: src/app/api/download/route.js
-import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-// Using absolute path with @ alias
-import { readFile } from '@/services/StorageService.js';
+import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
+// No readFile import needed from StorageService here, we'll use fs.promises directly
 
-// Safe console logging that won't break the API
+// Safe console logging
 const safeLog = (prefix, message) => {
   try {
-    console.log(`[API /download] ${prefix}: ${typeof message === 'object' ? JSON.stringify(message).substring(0, 200) + '...' : message}`);
+    // Ensure message is serializable before logging potentially large objects
+    let loggableMessage = message;
+    if (typeof message === 'object' && message !== null) {
+        loggableMessage = JSON.stringify(message).substring(0, 300) + '...';
+    } else if (typeof message === 'string') {
+        loggableMessage = message.substring(0, 300) + (message.length > 300 ? '...' : '');
+    }
+    console.log(`[API /download] ${prefix}: ${loggableMessage}`);
   } catch (error) {
-    console.log(`[API /download] Error logging ${prefix}`);
+    console.log(`[API /download] Error logging ${prefix}: ${error.message}`);
   }
 };
 
@@ -22,97 +28,89 @@ const safeLog = (prefix, message) => {
 export async function GET(request) {
     console.log('[API /download] Received GET request.');
   try {
-    // Get file path from query parameters
     const { searchParams } = new URL(request.url);
-    const filePath = searchParams.get('path');
-    safeLog('requested-file-path', filePath);
+    const requestedPath = searchParams.get('path'); // Get the raw path from query
+    safeLog('requested-file-path', requestedPath);
 
-    if (!filePath) {
+    if (!requestedPath) {
       console.error('[API /download] Error: No file path provided.');
-      return NextResponse.json(
-        { error: 'No file path provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No file path provided' }, { status: 400 });
     }
 
-    // Prevent path traversal attacks
-    let normalizedPath = path.normalize(filePath); // Changed from const to let
-    // Use /tmp in production environment for Vercel
+    // --- Path Validation Logic ---
+    // Normalize the requested path first
+    const normalizedPath = path.normalize(requestedPath);
+    safeLog('normalized-path', normalizedPath);
+
+    // Determine the expected base temporary directory based on environment
     const tempDir = process.env.NODE_ENV === 'production'
       ? '/tmp'
-      : (process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp'));
-    
-    safeLog('normalized-path', normalizedPath);
-    safeLog('temp-directory', tempDir);
+      // Ensure local path uses path.resolve for a consistent absolute path
+      : path.resolve(process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp'));
+    safeLog('temp-directory-base', tempDir);
 
-    // Security Check: Ensure the normalized path is within the temp directory
-    // Special handling for Vercel environment
-    const isPathSafe = normalizedPath.startsWith(tempDir) || 
-                      (process.env.NODE_ENV === 'production' && normalizedPath.startsWith('/tmp'));
-                      
+    // **Explicit Logging for Path Comparison**
+    safeLog('checking-if-path-starts-with', { path: normalizedPath, dir: tempDir });
+
+    // Security Check: Ensure the normalized path is within the expected temp directory
+    // This check needs to be robust for both local (absolute paths) and production (/tmp)
+    const isPathSafe = normalizedPath.startsWith(tempDir);
+
+    // **Log the outcome of the safety check**
+    safeLog('path-safety-check-result', { isPathSafe });
+
     if (!isPathSafe) {
-       console.error(`[API /download] Forbidden: Invalid file path outside temp directory`);
-      return NextResponse.json(
-        { error: 'Invalid file path' },
-        { status: 403 }
-      );
+       // Provide more context in the error log
+       console.error(`[API /download] Forbidden: Path "${normalizedPath}" is outside the allowed directory "${tempDir}".`);
+       return NextResponse.json(
+         { error: 'Invalid file path' },
+         { status: 403 } // Forbidden
+       );
     }
     safeLog('path-validation', 'Passed security check');
 
-    // Check if file exists using try/catch
+
+    // --- File Existence and Reading ---
+    let fileData;
     try {
-        // Try to directly access file to see if it exists
-        await fs.promises.access(normalizedPath, fs.constants.F_OK);
-        safeLog('file-exists', 'File exists, proceeding with download');
+        // **Crucial Check**: Verify file exists and is accessible *after* path validation
+        safeLog('checking-file-access', normalizedPath);
+        await fs.promises.access(normalizedPath, fs.constants.F_OK | fs.constants.R_OK); // Check for existence (F_OK) and read permission (R_OK)
+        safeLog('file-access-check', 'File exists and is readable');
+
+        // Read the file content *after* confirming existence
+        safeLog('reading-file-content', normalizedPath);
+        fileData = await fs.promises.readFile(normalizedPath);
+        safeLog('file-read-success', `Read ${fileData.length} bytes`);
+
     } catch (err) {
-        // If not found in specified location, try with /tmp as fallback in production
-        if (process.env.NODE_ENV === 'production' && !normalizedPath.startsWith('/tmp')) {
-          const tmpFallbackPath = path.join('/tmp', path.basename(normalizedPath));
-          safeLog('file-not-found-trying-fallback', tmpFallbackPath);
-          
-          try {
-            await fs.promises.access(tmpFallbackPath, fs.constants.F_OK);
-            // If found in fallback location, use that path
-            safeLog('fallback-file-exists', 'Using fallback path');
-            normalizedPath = tmpFallbackPath; // This was the line causing the error
-          } catch (fallbackErr) {
-            // Neither original nor fallback exists
-            console.error(`[API /download] Error: File not found in any location`);
+        // Handle specific errors, especially file not found (ENOENT)
+        if (err.code === 'ENOENT') {
+            console.error(`[API /download] Error: File not found at path: ${normalizedPath}`);
             return NextResponse.json(
                 { error: 'File not found' },
                 { status: 404 }
             );
-          }
+        } else if (err.code === 'EACCES') {
+             console.error(`[API /download] Error: Permission denied for file: ${normalizedPath}`);
+             return NextResponse.json(
+                 { error: 'Permission denied' },
+                 { status: 403 }
+             );
         } else {
-          // No fallback to try, file doesn't exist
-          console.error(`[API /download] Error: File not found at path: ${normalizedPath}`);
-          return NextResponse.json(
-              { error: 'File not found' },
-              { status: 404 }
-          );
+            // Log other unexpected errors during file access/read
+            console.error(`[API /download] Error accessing/reading file: ${normalizedPath}`, err);
+            throw err; // Re-throw unexpected errors to be caught by the outer try/catch
         }
     }
 
-    // Get file data using StorageService's readFile
-    safeLog('reading-file', 'Starting file read operation');
-    
-    let fileData;
-    try {
-      fileData = await readFile(normalizedPath);
-      safeLog('file-read-success', `File read: ${fileData.length} bytes`);
-    } catch (readError) {
-      // Try direct filesystem read as fallback if the service fails
-      safeLog('service-read-failed', 'Falling back to direct filesystem read');
-      fileData = await fs.promises.readFile(normalizedPath);
-    }
 
-    // Determine content type
+    // --- Determine Content Type and Send Response ---
     const extension = path.extname(normalizedPath).toLowerCase();
     let contentType = 'application/octet-stream'; // Default
 
-    // Common MIME types
     const mimeTypes = {
-        '.json': 'application/json',
+        '.json': 'application/json; charset=utf-8', // Specify charset for json
         '.md': 'text/markdown; charset=utf-8',
         '.txt': 'text/plain; charset=utf-8',
         '.pdf': 'application/pdf',
@@ -122,11 +120,9 @@ export async function GET(request) {
     contentType = mimeTypes[extension] || contentType;
     safeLog('content-type', contentType);
 
-    // Get filename from path for Content-Disposition
     const filename = path.basename(normalizedPath);
     safeLog('download-filename', filename);
 
-    // Create and return the response
     safeLog('sending-response', 'Returning file download response');
     return new Response(fileData, {
       status: 200,
@@ -138,10 +134,14 @@ export async function GET(request) {
         'Expires': '0',
       },
     });
+
   } catch (error) {
+    // Catch errors from URL parsing, path validation, or unexpected file read issues
     console.error('[API /download] Critical Error downloading file:', error);
+    // Avoid leaking potentially sensitive error details
+    const message = error.message?.includes('File not found') ? 'File not found' : 'Error downloading file';
     return NextResponse.json(
-      { error: 'Error downloading file: ' + error.message },
+      { error: message },
       { status: 500 }
     );
   }
@@ -158,8 +158,8 @@ export function OPTIONS() {
     {
       status: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*', // Restrict in production
-        'Access-Control-Allow-Methods': 'GET, OPTIONS', // Only GET is needed
+        'Access-Control-Allow-Origin': '*', // Restrict in production if needed
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     }
