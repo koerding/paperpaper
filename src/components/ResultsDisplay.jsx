@@ -1,17 +1,25 @@
 // File Path: src/components/ResultsDisplay.jsx
-// Complete version with score bars, CSS tooltips, and full rendering logic
+// Complete version using Tippy.js for tooltips and with score bars restored
 'use client'
 
 import { useState, useEffect } from 'react';
 import { Download, FileText, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
-// Import the rules directly
-import allRulesData from '@/rules.json'; // Adjust path if needed
+// Import the rules directly - ensure path is correct
+// Using alias assuming it's set up, otherwise use relative path like '../../rules.json'
+import allRulesData from '@/rules.json';
+
+// Import Tippy - includes default styling
+import Tippy from '@tippyjs/react';
+import 'tippy.js/dist/tippy.css'; // Default css (important!)
+// Optional: import a theme if you use the theme prop
+// import 'tippy.js/themes/light-border.css';
 
 // --- Build Rule Title Map Dynamically ---
 const buildRuleMap = () => {
     const map = new Map();
     if (allRulesData?.rules && Array.isArray(allRulesData.rules)) {
         allRulesData.rules.forEach(rule => {
+            // Use originalRuleNumber (as string) as key, store title
             if (rule.originalRuleNumber && rule.title) {
                 map.set(String(rule.originalRuleNumber), rule.title);
             }
@@ -22,47 +30,54 @@ const buildRuleMap = () => {
     }
     return map;
 };
+// Create the map instance once
 const ruleTitleMap = buildRuleMap();
 
 const getRuleTitle = (ruleNum) => {
+    // Ensure ruleNum is treated as a string for map lookup
     const key = String(ruleNum);
-    // console.log(`[getRuleTitle] Looking up rule number: "${key}" (type: ${typeof key})`);
-    const title = ruleTitleMap.get(key);
+    // console.log(`[getRuleTitle] Looking up rule number: "${key}" (type: ${typeof key})`); // Keep commented unless debugging needed
+    const title = ruleTitleMap.get(key); // Use Map's get method
     if (!title) {
         console.warn(`[getRuleTitle] No title found for rule number: "${key}" in dynamic map.`);
     }
-    return title || 'Unknown Rule';
+    return title || 'Unknown Rule'; // Return title or default
 };
 
-// --- Component to render text with potential MnK tag and CSS tooltip ---
+// --- Component using Tippy for tooltip ---
 const FeedbackText = ({ text }) => {
     if (!text || typeof text !== 'string') { return <span>{text || ''}</span>; }
+    // Regex looks for MnK, 1 or 2 digits, optional colon, optional space
     const match = text.match(/^MnK(\d{1,2}):?\s*/);
     if (match) {
-        const ruleNum = match[1];
-        const tagText = match[0];
-        // console.log(`[FeedbackText] Matched tag: "${tagText}", Extracted ruleNum: "${ruleNum}"`);
-        const ruleTitle = getRuleTitle(ruleNum);
+        const ruleNum = match[1]; // Captured number (string)
+        const tagText = match[0]; // The full tag matched (e.g., "MnK3: ")
+        // console.log(`[FeedbackText] Matched tag: "${tagText}", Extracted ruleNum: "${ruleNum}"`); // Keep commented unless debugging needed
+        const ruleTitle = getRuleTitle(ruleNum); // Pass the string number
         const remainingText = text.substring(tagText.length);
+
+        // Wrap the tag span with Tippy component
         return (
             <>
-                {/* Tooltip Container */}
-                <span className="relative inline-block group">
-                    {/* The MnK Tag itself */}
+                <Tippy
+                    content={ruleTitle} // Tooltip content
+                    placement="top"     // Default placement (Tippy adjusts)
+                    arrow={true}        // Optional arrow
+                    // theme="light-border" // Optional theme (requires css import)
+                    interactive={false} // Tooltip disappears when mouse leaves tag
+                    appendTo={() => document.body} // Append to body to avoid clipping issues in complex layouts
+                 >
+                     {/* The element Tippy attaches to */}
                     <span className="font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-sm text-xs mr-1 cursor-help whitespace-nowrap">
                         MnK{ruleNum}
                     </span>
-                    {/* The CSS Tooltip Span */}
-                    <span className="absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-xs px-3 py-1.5 text-xs font-medium leading-tight text-white bg-gray-800 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none transform -translate-x-1/2">
-                        {ruleTitle}
-                        <svg className="absolute text-gray-800 h-2 w-full left-0 top-full" x="0px" y="0px" viewBox="0 0 255 255" xmlSpace="preserve"><polygon className="fill-current" points="0,0 127.5,127.5 255,0"/></svg>
-                    </span>
-                </span>
+                 </Tippy>
                 {' '} {/* Explicit space */}
                 <span>{remainingText}</span>
             </>
         );
     }
+    // If no tag, render text as is
     return <span>{text}</span>;
 };
 
@@ -72,10 +87,15 @@ export default function ResultsDisplay({ results }) {
 
   useEffect(() => {
      console.log("[ResultsDisplay] Received results prop keys:", results ? JSON.stringify(Object.keys(results)) : "null/undefined");
+     // Add more detailed check if needed
+     if(results){
+        console.log("[ResultsDisplay] Checking data: DA keys:", results.documentAssessment ? Object.keys(results.documentAssessment) : 'N/A', "|| Recs count:", results.overallRecommendations?.length ?? 'N/A');
+     }
    }, [results]);
 
   if (!results) { return ( <div className="text-center p-8 border rounded-lg"><p className="text-muted-foreground">No results available</p></div>) }
 
+  // Simple check if there's *any* relevant data to show in the main sections
   const hasDisplayableData = results.documentAssessment || results.overallRecommendations || results.majorIssues || results.statistics || results.abstract || results.sections;
 
   // --- Helper function definitions ---
@@ -131,7 +151,7 @@ export default function ResultsDisplay({ results }) {
       {/* Analysis Content */}
       <div className="space-y-6">
 
-         {/* --- Document Assessment (Restored Fully) --- */}
+         {/* Document Assessment */}
          {results.documentAssessment && typeof results.documentAssessment === 'object' && Object.keys(results.documentAssessment).length > 0 ? (
             <div className="border rounded-lg overflow-hidden">
                 <div className="bg-muted/30 px-4 py-2 font-medium">Document Assessment</div>
@@ -149,14 +169,11 @@ export default function ResultsDisplay({ results }) {
                           <span className="text-sm font-medium text-muted-foreground">{formattedKey}</span>
                           <span className={`font-bold text-lg ${scoreColor}`}>{displayScore}/10</span>
                         </div>
-                        {/* Score Bar JSX */}
+                        {/* Score Bar */}
                         <div className="w-full bg-muted/30 rounded-full h-2.5 overflow-hidden">
-                          <div
-                             className={`h-2.5 rounded-full ${barBgClass} transition-all duration-500 ease-out`}
-                             style={{ width: `${displayScore * 10}%` }}
-                           ></div>
+                          <div className={`h-2.5 rounded-full ${barBgClass} transition-all duration-500 ease-out`} style={{ width: `${displayScore * 10}%` }}></div>
                         </div>
-                        {/* Assessment/Recommendation Text */}
+                        {/* Assessment/Recommendation */}
                         {assessment.assessment && <p className="text-xs text-muted-foreground pt-1"><FeedbackText text={assessment.assessment} /></p>}
                         {assessment.recommendation && <p className="text-xs text-blue-600 pt-1"><span className='italic mr-1'>Recommend:</span><FeedbackText text={assessment.recommendation} /></p>}
                       </div>
@@ -165,10 +182,8 @@ export default function ResultsDisplay({ results }) {
                 </div>
             </div>
          ) : null }
-         {/* --- End Document Assessment --- */}
 
-
-         {/* --- Top Recommendations (Restored Fully) --- */}
+         {/* Top Recommendations */}
          {results.overallRecommendations && Array.isArray(results.overallRecommendations) && results.overallRecommendations.length > 0 ? (
             <div className="border rounded-lg overflow-hidden">
                 <div className="bg-muted/30 px-4 py-2 font-medium">Top Recommendations</div>
@@ -184,9 +199,8 @@ export default function ResultsDisplay({ results }) {
                 </div>
             </div>
          ) : null }
-         {/* --- End Top Recommendations --- */}
 
-          {/* --- Major Document-Level Issues (Restored Fully) --- */}
+          {/* Major Document-Level Issues */}
           {results.majorIssues && Array.isArray(results.majorIssues) && results.majorIssues.length > 0 ? (
             <div className="border rounded-lg overflow-hidden">
               <div className="bg-destructive/10 px-4 py-2 font-medium text-destructive flex items-center space-x-2"><AlertTriangle className="h-5 w-5"/><span>Major Document-Level Issues</span></div>
@@ -209,9 +223,8 @@ export default function ResultsDisplay({ results }) {
               </div>
             </div>
           ) : null }
-         {/* --- End Major Issues --- */}
 
-         {/* --- Issues Statistics (Restored Fully) --- */}
+         {/* Issues Statistics */}
          {results.statistics && typeof results.statistics === 'object' ? (
              <div className="grid grid-cols-3 gap-4">
                  <div className="border rounded-lg p-4 text-center space-y-1 bg-red-50/50"><span className="text-3xl font-bold text-destructive">{results.statistics.critical ?? 0}</span><p className="text-sm text-muted-foreground">Critical Issues</p></div>
@@ -219,9 +232,8 @@ export default function ResultsDisplay({ results }) {
                  <div className="border rounded-lg p-4 text-center space-y-1 bg-blue-50/50"><span className="text-3xl font-bold text-blue-500">{results.statistics.minor ?? 0}</span><p className="text-sm text-muted-foreground">Minor Issues</p></div>
              </div>
          ) : null }
-         {/* --- End Statistics --- */}
 
-         {/* --- Abstract Analysis (Restored Fully) --- */}
+         {/* Abstract Analysis */}
          {results.abstract && typeof results.abstract === 'object' ? (
              <div className="border rounded-lg overflow-hidden">
                  <div className="bg-muted/30 px-4 py-2 font-medium">Abstract</div>
@@ -250,9 +262,8 @@ export default function ResultsDisplay({ results }) {
                  </div>
              </div>
           ) : null }
-          {/* --- End Abstract Analysis --- */}
 
-         {/* --- Sections Analysis (Restored Fully) --- */}
+         {/* Sections Analysis */}
           {results.sections && Array.isArray(results.sections) && results.sections.length > 0 ? (
              results.sections.map((section, sectionIndex) => {
                if (!section || typeof section !== 'object' || !section.name || !Array.isArray(section.paragraphs)) return null;
@@ -267,7 +278,6 @@ export default function ResultsDisplay({ results }) {
                           <div className="flex items-center space-x-2 mb-1"><FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" /><p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Paragraph {paragraphIndex + 1}</p></div>
                           <div className="text-sm leading-relaxed pl-6">{paragraph.text}</div>
                           {paragraph.summary && <div className="pl-6"><p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-1">Summary:</p><p className="text-sm italic text-muted-foreground">{paragraph.summary}</p></div>}
-                          {/* Structure Assessment Tags */}
                           {paragraph.evaluations && typeof paragraph.evaluations === 'object' && (
                             <div className="pl-6 pt-2">
                               <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Structure Assessment:</p>
@@ -280,7 +290,6 @@ export default function ResultsDisplay({ results }) {
                               </div>
                             </div>
                            )}
-                           {/* Issues Found */}
                           {paragraph.issues && Array.isArray(paragraph.issues) && paragraph.issues.length > 0 && (
                             <div className="pl-6 pt-2">
                               <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Issues Found:</p>
@@ -308,7 +317,6 @@ export default function ResultsDisplay({ results }) {
               );
             })
           ) : null }
-          {/* --- End Sections Analysis --- */}
        </div>
     </div>
   )
