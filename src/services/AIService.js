@@ -1,5 +1,5 @@
 // File Path: src/services/AIService.js
-// Complete file: Using a better JSON template and improved prompting for full document extraction
+// Complete file with merged changes and fixed issue structure
 
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
@@ -164,7 +164,7 @@ const validateResults = (analysisResult) => {
 
 // --- Main Analysis Function ---
 export async function analyzeDocumentStructure(document /* unused */, rawText) {
-  console.log('[AIService] Starting single-call analysis (fill-template prompt v7)...'); // Updated log
+  console.log('[AIService] Starting single-call analysis (fill-template prompt v8)...'); // Updated log
   const serviceStartTime = Date.now();
 
   try {
@@ -266,10 +266,8 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
         ]
     }, null, 2);
 
-    // --- Construct Improved Prompt ---
-
-// --- Construct Improved Prompt with mandatory detailed explanations ---
-let fullPrompt = `
+    // --- Construct Improved Prompt with merged changes ---
+    let fullPrompt = `
 You are an expert scientific writing analyzer based on the Mensh & Kording (MnK) 10 Simple Rules paper. Your primary goal is to meticulously analyze the provided paper text and return a COMPLETE and VALID JSON object based EXACTLY on the template provided.
 
 **TASK:**
@@ -333,11 +331,46 @@ When in doubt, mark the evaluation as FALSE and provide specific feedback. The g
 - If multiple criteria are 'false' for a paragraph, include a separate issue entry for EACH failed criterion
 - The explanation should be detailed enough that the author can understand exactly what needs to be fixed
 
+**REQUIRED ISSUE STRUCTURE FORMAT:**
+When structuring the "issues" array in your JSON output, you MUST follow this exact format:
+
+"issues": [
+  {
+    "issue": "MnK2: This sentence is too long and complex, making it difficult to follow the main point.",
+    "severity": "major",
+    "recommendation": "MnK2: Break this into two shorter sentences focusing on one idea each."
+  },
+  {
+    "issue": "MnK3: The paragraph lacks a clear topic sentence that introduces the main point.",
+    "severity": "critical", 
+    "recommendation": "MnK3: Add a clear topic sentence at the beginning that summarizes the paragraph's focus."
+  }
+]
+
+Notice each issue is an object with exactly three string properties:
+1. "issue": This starts with "MnK#: " followed by a detailed explanation of the problem
+2. "severity": Must be one of these exact values: "critical", "major", or "minor"
+3. "recommendation": This starts with "MnK#: " followed by specific advice to fix the problem
+
+Do NOT structure issues like this (which is WRONG):
+"issues": [
+  {
+    "MnK2": {
+      "severity": "major",
+      "explanation": "Long sentence makes it difficult to follow.",
+      "recommendation": "Break into two sentences."
+    }
+  }
+]
+
+The correct structure is CRITICAL for the system to properly display your feedback to users.
+
 **Paragraph Evaluation Details:** For EACH paragraph identified in the text (including the abstract):
 * Fill the "evaluations" object using ONLY these EXACT boolean keys: **"cccStructure", "sentenceQuality", "topicContinuity", "terminologyConsistency", "structuralParallelism"**.
 * Fill the "issues" array: **IF any evaluation flag is \`false\`, MUST add a corresponding issue object**. Prepend rule-specific feedback with "MnK{ruleNumber}: ". If all flags \`true\`, use \`[]\`.
 * Be STRICT in your evaluation. High-quality scientific writing is rare - if you're marking most paragraphs as perfect, you're not being critical enough.
 * Every issue MUST be explained in enough detail that the author can understand exactly what's wrong and how to fix it.
+* Use the EXACT issue structure format specified above.
 
 **Document Assessment Details:** MUST provide scores (1-10), assessments, recommendations for ALL keys: "titleQuality", "abstractCompleteness", "introductionStructure", "resultsOrganization", "discussionQuality", "messageFocus", "topicOrganization". Prepend rule-specific feedback with "MnK{ruleNumber}: ".
 
@@ -354,7 +387,6 @@ ${paragraphRulesPrompt}
 --- Document Rules ---
 ${documentRulesPrompt}
 `;
-    
 
     // Add document structure to the prompt if available
     if (documentStructure && documentStructure.sections && documentStructure.sections.length > 0) {
@@ -382,6 +414,7 @@ ${jsonTemplate}
 - Use boolean \`true\`/\`false\` for paragraph evaluations.
 - Generate an 'issue' item whenever a paragraph evaluation is \`false\`.
 - Strictly follow the MnK$ tagging requirement.
+- Follow the EXACT issue structure format specified earlier.
 `;
 
     // **** Log the full prompt ****
@@ -440,6 +473,18 @@ According to my analysis, the document has:
 - ${documentStructure.sections.length} sections
 - Approximately ${documentStructure.sections.reduce((sum, s) => sum + s.paragraphCount, 0)} paragraphs
 Your response must reflect this structure completely.` : ''}
+
+ALSO, VERY IMPORTANT - you MUST follow the correct issue structure format:
+
+"issues": [
+  {
+    "issue": "MnK2: Clear explanation of the problem...",
+    "severity": "major",
+    "recommendation": "MnK2: Specific advice to fix it..."
+  }
+]
+
+Do NOT use nested objects in the issues array.
 
 Here's the paper text again:
 \`\`\`
@@ -581,5 +626,3 @@ Return a complete, valid JSON with ALL sections and paragraphs following the tem
     };
   }
 } // End of analyzeDocumentStructure
-
-
