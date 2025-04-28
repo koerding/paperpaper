@@ -54,7 +54,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
   const [fileText, setFileText] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [isPdfFile, setIsPdfFile] = useState(false);
-  const maxSize = 20 * 1024 * 1024;
+  const maxSize = 200 * 1024 * 1024;
   
   // onDrop handler with PDF support
   const onDrop = useCallback(async (acceptedFiles, fileRejections) => {
