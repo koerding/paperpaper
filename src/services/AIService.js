@@ -323,7 +323,7 @@ ${jsonTemplate}
 
 **FINAL INSTRUCTIONS:**
 - Return ONLY the completed, valid JSON object based on the template.
-- Do NOT skip any sections or paragraphs found in the paper.
+- Do NOT skip any sections or paragraphs found in the paper apart from references and stray sentences.
 - Do NOT limit yourself to the number of example sections/paragraphs shown in the template.
 - Include EVERY section and EVERY paragraph with all required evaluations.
 - Use boolean \`true\`/\`false\` for paragraph evaluations.
