@@ -57,11 +57,32 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
   const maxSize = 10 * 1024 * 1024;
   
   // onDrop handler with PDF support
-  const onDrop = useCallback(async (acceptedFiles) => {
-        console.log('[FileUploader] onDrop triggered.');
+  const onDrop = useCallback(async (acceptedFiles, fileRejections) => {
+        console.log('[FileUploader] onDrop triggered. Accepted files:', acceptedFiles?.length || 0);
+        
+        // Log any rejections for debugging
+        if (fileRejections && fileRejections.length > 0) {
+          console.error('[FileUploader] Files rejected:', fileRejections);
+          const rejectReasons = fileRejections.map(reject => 
+            `${reject.file.name}: ${reject.errors.map(e => e.message).join(', ')}`
+          ).join('; ');
+          setError(`File rejected: ${rejectReasons}`);
+          return;
+        }
+        
         setError(null);
         const uploadedFile = acceptedFiles[0];
-        if (!uploadedFile) { console.log('[FileUploader] No file accepted.'); return; }
+        if (!uploadedFile) { 
+            console.log('[FileUploader] No file accepted.');
+            return; 
+        }
+        
+        console.log('[FileUploader] File details:', {
+            name: uploadedFile.name,
+            type: uploadedFile.type,
+            size: uploadedFile.size,
+            lastModified: new Date(uploadedFile.lastModified).toISOString()
+        });
         
         // Reset states
         setFile(uploadedFile);
@@ -69,6 +90,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         
         // Check if it's a PDF file
         const isPdf = uploadedFile.type === 'application/pdf' || uploadedFile.name?.endsWith('.pdf');
+        console.log(`[FileUploader] Is PDF file? ${isPdf}`);
         setIsPdfFile(isPdf);
         
         // Validation logic
@@ -78,32 +100,10 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
             return; 
         }
         
-        // Updated valid types list with PDF
-        const validTypes = [
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
-            'application/pdf',
-            'text/plain', 
-            'text/markdown', 
-            'text/x-tex', 
-            'application/x-tex' 
-        ];
-        
-        const isValidByMime = validTypes.includes(uploadedFile.type);
-        const isValidByExt = uploadedFile.name?.endsWith('.tex') || 
-                            uploadedFile.name?.endsWith('.pdf') ||
-                            uploadedFile.name?.endsWith('.docx') ||
-                            uploadedFile.name?.endsWith('.txt') ||
-                            uploadedFile.name?.endsWith('.md');
-                            
-        if (!isValidByMime && !isValidByExt) { 
-            setError('Unsupported file type. Please upload .pdf, .docx, .txt, .md, or .tex files.'); 
-            setFile(null); 
-            return; 
-        }
-        
-        // Client-side text extraction with progress tracking for PDFs
+        // Client-side text extraction
         try {
             setIsExtracting(true);
+            console.log(`[FileUploader] Starting text extraction for ${uploadedFile.name}`);
             
             const extractedText = await extractTextFromFile(uploadedFile);
             console.log(`[FileUploader] Client-side text extracted successfully. Length: ${extractedText.length}`);
@@ -120,16 +120,19 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
             // Set specific error for PDF extraction failures
             if (isPdf) {
                 setError(`Could not extract text from PDF: ${err.message}. Try a different PDF or file format.`);
+            } else {
+                setError(`Error extracting text: ${err.message}`);
             }
         } finally {
             setIsExtracting(false);
         }
    }, [setError, maxSize]);
    
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({ 
     onDrop, 
     multiple: false, 
     maxSize,
+    // Simplified accept config - this can sometimes cause issues in some browsers
     accept: {
       'application/pdf': ['.pdf'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
@@ -137,7 +140,9 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
       'text/markdown': ['.md'],
       'text/x-tex': ['.tex'],
       'application/x-tex': ['.tex']
-    }
+    },
+    noClick: false, // Make sure click is enabled
+    noKeyboard: false, // Make sure keyboard is enabled
   });
   
   const handleSubmit = async () => {
@@ -154,6 +159,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
       }
       catch (err) { 
           console.error('[FileUploader] Error calling onFileSubmit prop:', err); 
+          setError(`Error submitting file: ${err.message}`);
       }
       finally { 
           console.log('[FileUploader] handleSubmit finished.'); 
@@ -211,6 +217,19 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
            </div>
          </div>
        </div>
+       
+      {/* Alternative manual file input button */}
+      {!file && (
+        <div className="text-center">
+          <button 
+            type="button"
+            onClick={open}
+            className="px-4 py-2 bg-muted text-muted-foreground rounded-md hover:bg-muted/80 transition-colors"
+          >
+            Or click here to select a file
+          </button>
+        </div>
+      )}
        
       {/* Selected File Info & Submit Button Section */}
       {file && (
