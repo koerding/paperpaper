@@ -1,5 +1,11 @@
 // File Path: src/services/ProcessingService.client.js
 import mammoth from 'mammoth';
+// Import PDF.js library
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Load PDF.js worker (required for PDF parsing)
+pdfjsLib.GlobalWorkerOptions.workerSrc = 
+  `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // Client-only debug logger
 const clientDebugLog = (prefix, content) => {
@@ -8,6 +14,42 @@ const clientDebugLog = (prefix, content) => {
       JSON.stringify(content).substring(0, 100) + '...' : 
       content?.substring?.(0, 100) + '...');
 };
+
+/**
+ * Extract text from a PDF file
+ * @param {ArrayBuffer} arrayBuffer - The PDF file as an array buffer
+ * @returns {Promise<string>} - Extracted text content
+ */
+export async function extractTextFromPDF(arrayBuffer) {
+  console.log('[ProcessingService.client] Extracting text from PDF...');
+  try {
+    // Load the PDF file
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const numPages = pdf.numPages;
+    console.log(`[ProcessingService.client] PDF loaded with ${numPages} pages`);
+    
+    // Extract text from each page
+    let textContent = [];
+    for (let i = 1; i <= numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(item => item.str).join(' ');
+      textContent.push(pageText);
+      
+      if (i % 10 === 0 || i === numPages) {
+        console.log(`[ProcessingService.client] Extracted text from page ${i}/${numPages}`);
+      }
+    }
+    
+    // Join all pages with double newlines between pages
+    const fullText = textContent.join('\n\n');
+    clientDebugLog('extracted-pdf-text', fullText);
+    return fullText;
+  } catch (error) {
+    console.error('[ProcessingService.client] Error extracting text from PDF:', error);
+    throw new Error(`Failed to extract text from PDF: ${error.message}`);
+  }
+}
 
 /**
  * Extract text from various file formats (client-side version)
@@ -32,6 +74,9 @@ export async function extractTextFromFile(file) {
       console.log('[ProcessingService.client] DOCX text extracted successfully.');
       clientDebugLog('extracted-docx-text', result.value);
       return result.value;
+    } else if (file.type === 'application/pdf' || file.name?.endsWith('.pdf')) {
+      // Handle PDF extraction
+      return await extractTextFromPDF(arrayBuffer);
     } else if (file.type === 'text/plain' || file.name?.endsWith('.txt')) {
       console.log('[ProcessingService.client] Extracting text from TXT...');
       const text = new TextDecoder().decode(arrayBuffer);
