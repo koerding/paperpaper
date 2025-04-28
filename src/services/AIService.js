@@ -83,8 +83,8 @@ You are an expert scientific writing analyzer based on the Mensh & Kording (MnK)
 **TASK:**
 1.  Read the **PAPER TEXT**.
 2.  Analyze the text based on the **EVALUATION RULES**.
-3.  **Fill in** the provided **JSON TEMPLATE** with your analysis results. Replace ALL placeholders like "..." and null values. **CRITICAL: Ensure every single field specified in the template is present and filled in the final JSON.**
-4.  **Paragraph Evaluation Details:**
+3.  **Fill in** the provided **JSON TEMPLATE** with your analysis results. Replace ALL placeholders like "..." and null values. **CRITICAL: Ensure every single field specified in the template is present and filled in the final JSON. And for the paragraph analysis make sure that every single paragraph that is more than a fragment gets its structure in the JSON.**
+4.  **Paragraph Evaluation Details (do this for every paragraph that is more than a fragment):**
     * For the "evaluations" object (in abstract & paragraphs), provide boolean flags (\`true\`/\`false\`) ONLY for these keys: **"cccStructure", "sentenceQuality", "topicContinuity", "terminologyConsistency", "structuralParallelism"**.
     * For the "issues" array (in abstract & paragraphs): **IF any evaluation flag is \`false\`, you MUST add a corresponding issue object**. Prepend rule-specific feedback with "MnK{ruleNumber}: ". If all flags \`true\`, the issues array MUST be empty \`[]\`.
 5.  **Document Assessment Details:** You MUST provide scores (1-10), assessments, and recommendations for ALL of the following keys: **"titleQuality", "abstractCompleteness", "introductionStructure", "resultsOrganization", "discussionQuality", "messageFocus", "topicOrganization"**. Ensure ALL these keys are present in the output object. Prepend rule-specific feedback with "MnK{ruleNumber}: ".
