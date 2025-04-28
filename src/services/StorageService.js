@@ -1,34 +1,41 @@
 // File Path: src/services/StorageService.js
+// Complete file with full generateSummaryReport logic
+
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 
-// Promisify fs functions for cleaner async/await usage
+// Promisify fs functions
 const writeFileAsync = promisify(fs.writeFile);
 const readFileAsync = promisify(fs.readFile);
 const mkdirAsync = promisify(fs.mkdir);
 const unlinkAsync = promisify(fs.unlink);
-const accessAsync = fs.promises ? fs.promises.access : promisify(fs.access); // Prefer fs.promises
-const readdirAsync = fs.promises ? fs.promises.readdir : promisify(fs.readdir); // Prefer fs.promises
+const accessAsync = fs.promises ? fs.promises.access : promisify(fs.access);
+const readdirAsync = fs.promises ? fs.promises.readdir : promisify(fs.readdir);
 
-// Get temp directory - critically important to use /tmp in Vercel serverless environment
+// Get temp directory
 const TEMP_DIR = process.env.NODE_ENV === 'production'
   ? '/tmp'
   : (process.env.TEMP_FILE_PATH || path.join(process.cwd(), 'tmp'));
 
-// Safe console logging that won't break in production
+// Safe console logging
 const safeLog = (prefix, message) => {
   try {
-    console.log(`[StorageService] ${prefix}: ${typeof message === 'object' ? JSON.stringify(message).substring(0, 200) + '...' : message}`);
+    // Ensure message is serializable before logging potentially large objects
+    let loggableMessage = message;
+    if (typeof message === 'object' && message !== null) {
+        loggableMessage = JSON.stringify(message).substring(0, 300) + '...';
+    } else if (typeof message === 'string') {
+        loggableMessage = message.substring(0, 300) + (message.length > 300 ? '...' : '');
+    }
+    console.log(`[StorageService] ${prefix}: ${loggableMessage}`);
   } catch (error) {
-    console.log(`[StorageService] Error logging ${prefix}`);
+    console.log(`[StorageService] Error logging ${prefix}: ${error.message}`);
   }
 };
 
-/**
- * Initialize storage - ensure temp directory exists
- * @returns {Promise<void>}
- */
+
+// initStorage function
 export const initStorage = async () => {
   try {
      // Check existence using fs.promises.access
@@ -39,32 +46,32 @@ export const initStorage = async () => {
           // If error code is ENOENT (Not Found), create the directory
           if (err.code === 'ENOENT') {
               safeLog('initStorage', `Temp directory not found, creating: ${TEMP_DIR}`);
-              await mkdirAsync(TEMP_DIR, { recursive: true });
-              safeLog('initStorage', `Temp directory created successfully.`);
+              try {
+                  await mkdirAsync(TEMP_DIR, { recursive: true });
+                  safeLog('initStorage', `Temp directory created successfully.`);
+              } catch (mkdirErr) {
+                   console.error(`[StorageService] Error creating temp directory ${TEMP_DIR}:`, mkdirErr);
+                   // Allow process to potentially continue, but log critical error
+              }
           } else {
               // Rethrow other errors (e.g., permission issues)
-              throw err;
+              console.error('[StorageService] Error checking temp directory existence:', err);
+              // Potentially throw err;
           }
      }
   } catch (error) {
     console.error('[StorageService] Error initializing storage:', error);
-    // Don't throw - allow the process to continue even if directory creation fails
-    safeLog('initStorage', 'Continuing without storage directory');
+    // Don't throw - allow the process to continue if possible
+    safeLog('initStorage', 'Continuing after storage initialization error');
   }
 };
 
-/**
- * Save a file to temporary storage
- * @param {Buffer|string} data - File data
- * @param {string} filename - Original filename
- * @param {string} submissionId - Unique submission ID
- * @returns {Promise<string>} - Path to saved file
- */
+// saveFile function
 export const saveFile = async (data, filename, submissionId) => {
   try {
-    await initStorage(); // Ensure directory exists
+    await initStorage(); // Ensure directory exists or attempt creation
 
-    // Generate a safe filename to prevent path traversal and conflicts
+    // Generate a safe filename
     const safeFilename = `${submissionId}-${Date.now()}-${path.basename(filename).replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const filePath = path.join(TEMP_DIR, safeFilename);
     safeLog('saveFile', `Saving file to path: ${filePath}`);
@@ -73,20 +80,14 @@ export const saveFile = async (data, filename, submissionId) => {
     await writeFileAsync(filePath, data);
     safeLog('saveFile', `File saved successfully.`);
 
-    return filePath;
+    return filePath; // Return the actual path where it was saved
   } catch (error) {
     console.error('[StorageService] Error saving file:', error);
-    // Return null instead of throwing - let caller decide how to handle
-    return null;
+    return null; // Return null on failure
   }
 };
 
-/**
- * Save analysis results to a file
- * @param {Object} results - Analysis results
- * @param {string} submissionId - Unique submission ID
- * @returns {Promise<string>} - Path to saved file
- */
+// saveResults function
 export const saveResults = async (results, submissionId) => {
   try {
     await initStorage(); // Ensure directory exists
@@ -99,19 +100,19 @@ export const saveResults = async (results, submissionId) => {
     await writeFileAsync(filePath, JSON.stringify(results, null, 2)); // Pretty print JSON
     safeLog('saveResults', `Results JSON saved successfully.`);
 
-    return filePath;
+    return filePath; // Return the actual path
   } catch (error) {
     console.error('[StorageService] Error saving results JSON:', error);
-    // Return null instead of throwing - let caller decide how to handle
     return null;
   }
 };
 
+
 /**
  * Generate a summary report in Markdown format
- * @param {Object} results - Analysis results
+ * @param {Object} results - Analysis results from AI Service
  * @param {string} submissionId - Unique submission ID
- * @returns {Promise<string>} - Path to saved report file
+ * @returns {Promise<string|null>} - Path to saved report file or null on error
  */
 export const generateSummaryReport = async (results, submissionId) => {
   try {
@@ -121,61 +122,67 @@ export const generateSummaryReport = async (results, submissionId) => {
     const filePath = path.join(TEMP_DIR, filename);
     safeLog('generateSummaryReport', `Generating summary report at path: ${filePath}`);
 
-    // Basic check for results structure
+    // --- Basic Checks ---
     if (!results || typeof results !== 'object') {
         console.error('[StorageService] Cannot generate report: Invalid results object provided.');
         return null;
     }
+     if (results.analysisError) {
+         console.warn('[StorageService] Generating error report due to AI analysis failure.');
+          let errorReport = `# Scientific Paper Structure Assessment\n\n## Analysis Error\n\n`;
+          errorReport += `The analysis could not be completed successfully.\n`;
+          errorReport += `Error reported: ${results.analysisError}\n`;
+          await writeFileAsync(filePath, errorReport);
+          return filePath; // Return path to the error report
+     }
 
     // --- Report Generation Logic ---
     let report = `# Scientific Paper Structure Assessment\n\n`;
+    report += `## Paper: ${results.title || 'Title Not Provided'}\n\n`;
 
-    // Add title (handle potential missing title)
-    report += `## Paper: ${results.title || 'Title Not Found'}\n\n`;
-
-    // Add overall assessment (check if documentAssessment exists)
+    // --- Overall Assessment ---
     report += `## Overall Assessment\n\n`;
     if (results.documentAssessment && typeof results.documentAssessment === 'object') {
-        for (const [key, assessment] of Object.entries(results.documentAssessment)) {
-             if (assessment && typeof assessment === 'object') { // Check if assessment object is valid
-                 const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase());
-                 report += `- **${formattedKey}**: ${assessment.score ?? 'N/A'}/10 - ${assessment.assessment || 'No assessment'}\n`;
+        const assessmentOrder = ['titleQuality', 'abstractCompleteness', 'introductionStructure', 'resultsOrganization', 'discussionQuality', 'messageFocus', 'topicOrganization'];
+        assessmentOrder.forEach(key => {
+            const assessment = results.documentAssessment[key];
+            const formattedKey = key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase());
+            if (assessment && typeof assessment === 'object') {
+                 // Use nullish coalescing for safer access to potentially missing scores/text
+                 report += `- **${formattedKey}**: ${assessment.score ?? 'N/A'}/10 - ${assessment.assessment || 'No assessment text.'}\n`;
                  if (assessment.recommendation) {
                      report += `  - *Recommendation*: ${assessment.recommendation}\n`;
                  }
-             } else {
-                  report += `- **${key.replace(/([A-Z])/g, ' $1').replace(/^\w/, c => c.toUpperCase())}**: Assessment data missing\n`;
-             }
-        }
+            } else {
+                 report += `- **${formattedKey}**: Assessment data missing\n`; // Indicate if specific key is missing
+            }
+        });
     } else {
-         report += "Overall assessment data is missing.\n";
+         report += "Overall assessment data is missing or invalid.\n";
     }
 
-    // Add issue summary (check if statistics exist)
+    // --- Issue Summary ---
     report += `\n## Issue Summary\n\n`;
      const stats = results.statistics || {};
      report += `- Critical Issues: ${stats.critical ?? 0}\n`;
      report += `- Major Issues: ${stats.major ?? 0}\n`;
      report += `- Minor Issues: ${stats.minor ?? 0}\n`;
 
-    // Add top recommendations (check if overallRecommendations exists and is an array)
+    // --- Top Recommendations ---
     report += `\n## Top Recommendations\n\n`;
-     if (Array.isArray(results.overallRecommendations)) {
+     if (Array.isArray(results.overallRecommendations) && results.overallRecommendations.length > 0) {
          results.overallRecommendations.forEach((rec, index) => {
-             report += `${index + 1}. ${rec || 'N/A'}\n`;
+             report += `${index + 1}. ${rec || 'N/A'}\n`; // Handle potentially null/empty recommendations
          });
-          if (results.overallRecommendations.length === 0) {
-              report += "No specific overall recommendations provided.\n";
-          }
      } else {
-         report += "Overall recommendations data is missing or invalid.\n";
+         report += "No specific overall recommendations provided.\n";
      }
 
-    // Add prioritized issues (check if prioritizedIssues exists and is an array)
-     report += `\n## Prioritized Issues List\n\n`;
-     if (Array.isArray(results.prioritizedIssues) && results.prioritizedIssues.length > 0) {
-          results.prioritizedIssues.forEach((issue, index) => {
-              if (issue && typeof issue === 'object') { // Check if issue object is valid
+     // --- Major Issues List ---
+     report += `\n## Major Issues List\n\n`;
+     if (Array.isArray(results.majorIssues) && results.majorIssues.length > 0) {
+          results.majorIssues.forEach((issue, index) => {
+              if (issue && typeof issue === 'object') {
                   report += `### ${index + 1}. ${issue.issue || 'Issue description missing'}\n`;
                   report += `- **Severity**: ${issue.severity || 'N/A'}\n`;
                   report += `- **Location**: ${issue.location || 'N/A'}\n`;
@@ -183,13 +190,13 @@ export const generateSummaryReport = async (results, submissionId) => {
               }
           });
      } else {
-         report += "No prioritized issues listed.\n";
+         report += "No major issues listed.\n";
      }
 
-    // Add abstract analysis (check existence and structure)
+    // --- Abstract Analysis ---
+    report += `\n## Abstract Analysis\n\n`;
     if (results.abstract && typeof results.abstract === 'object') {
-      report += `\n## Abstract Analysis\n\n`;
-      report += `> ${results.abstract.text || 'Abstract text missing.'}\n\n`; // Use blockquote for text
+      report += `> ${results.abstract.text || 'Abstract text not found.'}\n\n`; // Use blockquote for text
       report += `**Summary**: ${results.abstract.summary || 'No summary provided.'}\n\n`;
 
       if (Array.isArray(results.abstract.issues) && results.abstract.issues.length > 0) {
@@ -204,157 +211,162 @@ export const generateSummaryReport = async (results, submissionId) => {
          report += "**Issues Found**: None\n\n";
       }
     } else {
-        report += "\n## Abstract Analysis\n\nAbstract data missing or invalid.\n";
+        report += "Abstract data missing or invalid.\n";
     }
 
-    // Add section analysis summaries (check existence and structure)
+    // --- Section Analysis ---
     report += `\n## Section Analysis\n\n`;
      if (Array.isArray(results.sections) && results.sections.length > 0) {
          results.sections.forEach((section, sIndex) => {
-             if (section && typeof section === 'object') { // Check section validity
-                 report += `### ${section.name || `Unnamed Section ${sIndex + 1}`}\n\n`;
-                 if (Array.isArray(section.paragraphs) && section.paragraphs.length > 0) {
-                      section.paragraphs.forEach((paragraph, pIndex) => {
-                          if (paragraph && typeof paragraph === 'object') { // Check paragraph validity
-                              report += `#### Paragraph ${pIndex + 1}\n\n`;
-                              
-                              // Include full paragraph text instead of just a preview
-                              report += `${paragraph.text || 'Paragraph text missing'}\n\n`;
-                              
-                              report += `**Summary**: ${paragraph.summary || 'No summary.'}\n\n`;
+             // Check section validity
+             if (section && typeof section === 'object' && section.name && Array.isArray(section.paragraphs)) {
+                 report += `### ${section.name}\n\n`;
+                 section.paragraphs.forEach((paragraph, pIndex) => {
+                     // Check paragraph validity
+                     if (paragraph && typeof paragraph === 'object') {
+                         report += `#### Paragraph ${pIndex + 1}\n\n`;
+                         report += `${paragraph.text || 'Paragraph text missing.'}\n\n`;
+                         report += `**Summary**: ${paragraph.summary || 'No summary provided.'}\n\n`;
 
-                              // Structure assessment (check evaluations object)
-                              report += `**Structure Assessment**:\n`;
-                              // Use the actual boolean values from paragraph.evaluations
-                              const evaluations = paragraph.evaluations || {};
-                              report += `- Context-Content-Conclusion: ${evaluations.cccStructure ? '✓ Yes' : '✗ No'}\n`;
-                              report += `- Sentence Quality: ${evaluations.sentenceQuality ? '✓ Good' : '✗ Needs Work'}\n`;
-                              report += `- Topic Continuity: ${evaluations.topicContinuity ? '✓ Good' : '✗ Fragmented'}\n`;
-                              report += `- Terminology Consistency: ${evaluations.terminologyConsistency ? '✓ Yes' : '✗ No'}\n`;
-                              report += `- Structural Parallelism: ${evaluations.structuralParallelism ? '✓ Yes' : '✗ No'}\n\n`;
+                         // --- Structure Assessment (Using Correct Keys) ---
+                         report += `**Structure Assessment**:\n`;
+                         const evals = paragraph.evaluations || {}; // Default to empty object for safety
+                         // Check for the specific keys expected by UI/Rules
+                         report += `- Context-Content-Conclusion: ${evals.cccStructure === true ? '✓ Yes' : '✗ No'}\n`;
+                         report += `- Sentence Quality: ${evals.sentenceQuality === true ? '✓ Good' : '✗ Needs Work'}\n`;
+                         report += `- Topic Continuity: ${evals.topicContinuity === true ? '✓ Good' : '✗ Fragmented'}\n`;
+                         report += `- Terminology Consistency: ${evals.terminologyConsistency === true ? '✓ Consistent' : '✗ Inconsistent'}\n`;
+                         report += `- Structural Parallelism: ${evals.structuralParallelism === true ? '✓ Good' : '✗ Needs Work'}\n\n`;
+                         // --- End Structure Assessment ---
 
-                              // Issues
-                              if (Array.isArray(paragraph.issues) && paragraph.issues.length > 0) {
-                                  report += `**Issues Found**:\n\n`;
-                                  paragraph.issues.forEach((issue, iIndex) => {
-                                       if (issue && typeof issue === 'object') {
-                                           report += `${iIndex + 1}. **${(issue.severity || 'N/A').toUpperCase()}**: ${issue.issue || 'Issue description missing.'}\n`;
-                                           report += `   - *Recommendation*: ${issue.recommendation || 'N/A'}\n\n`;
-                                       }
-                                  });
-                              } else {
-                                   report += "**Issues Found**: None\n\n";
-                              }
-                          } else {
-                               report += `#### Paragraph ${pIndex + 1}\n\nInvalid paragraph data.\n\n`;
-                          }
-                      });
-                 } else {
-                      report += "No paragraphs found or paragraph data is invalid for this section.\n\n";
-                 }
+                         // Paragraph Issues
+                         if (Array.isArray(paragraph.issues) && paragraph.issues.length > 0) {
+                             report += `**Issues Found**:\n\n`;
+                             paragraph.issues.forEach((issue, iIndex) => {
+                                  if (issue && typeof issue === 'object') {
+                                      report += `${iIndex + 1}. **${(issue.severity || 'N/A').toUpperCase()}**: ${issue.issue || 'Issue description missing.'}\n`;
+                                      report += `   - *Recommendation*: ${issue.recommendation || 'N/A'}\n\n`;
+                                  }
+                             });
+                         } else {
+                              report += "**Issues Found**: None\n\n";
+                         }
+                     } else {
+                          report += `#### Paragraph ${pIndex + 1}\n\nInvalid paragraph data.\n\n`;
+                     }
+                 });
              } else {
-                  report += `### Unnamed Section ${sIndex + 1}\n\nInvalid section data.\n\n`;
+                  report += `### Section ${sIndex + 1}\n\nInvalid section data or missing paragraphs.\n\n`;
              }
          });
      } else {
          report += "No sections found or section data is invalid.\n";
      }
 
-    // Write report to file
+    // --- Write Report File ---
     await writeFileAsync(filePath, report);
     safeLog('generateSummaryReport', `Summary report generated successfully.`);
 
-    return filePath;
+    return filePath; // Return the path
+
   } catch (error) {
     console.error('[StorageService] Error generating summary report:', error);
-    // Return null instead of throwing - let caller decide how to handle
-    return null;
+    return null; // Return null on error
   }
 };
 
 
-/**
- * Read a file from storage
- * @param {string} filePath - Path to file
- * @returns {Promise<Buffer>} - File contents
- */
+// readFile function
 export const readFile = async (filePath) => {
   try {
      safeLog('readFile', `Reading file from path: ${filePath}`);
-    // Basic check to ensure path seems plausible before reading
      if (!filePath || typeof filePath !== 'string') {
          throw new Error('Invalid file path provided for reading.');
      }
-    const data = await readFileAsync(filePath);
+     // Basic check to prevent reading outside intended directory (redundant with download route check but safer)
+     const intendedDir = path.resolve(TEMP_DIR);
+     const resolvedPath = path.resolve(filePath);
+     if (!resolvedPath.startsWith(intendedDir)) {
+          console.error(`[StorageService] Attempt to read file outside TEMP_DIR: ${resolvedPath}`);
+          throw new Error('Access denied to file path.');
+     }
+
+     const data = await readFileAsync(resolvedPath); // Use resolved path
      safeLog('readFile', `File read successfully. Size: ${data.length}`);
-    return data;
+     return data;
   } catch (error) {
-    console.error('[StorageService] Error reading file:', filePath, error);
-    // Throw a new error to avoid exposing raw fs errors potentially
-    throw new Error(`Failed to read file at path: ${path.basename(filePath)}`);
+     console.error('[StorageService] Error reading file:', filePath, error);
+     // Throw a more generic error to the caller
+     throw new Error(`Failed to read file: ${path.basename(filePath)}`);
   }
 };
 
-/**
- * Delete a file from storage
- * @param {string} filePath - Path to file
- * @returns {Promise<void>}
- */
+// deleteFile function
 export const deleteFile = async (filePath) => {
+  // Add basic path check before attempting deletion
+  if (!filePath || typeof filePath !== 'string') {
+     console.warn(`[StorageService] Invalid filePath provided for deletion: ${filePath}`);
+     return;
+  }
   try {
      safeLog('deleteFile', `Attempting to delete file: ${filePath}`);
-     // Use fs.promises.access to check existence first
       try {
+          // Check if path exists before unlinking
           await accessAsync(filePath, fs.constants.F_OK);
-          // File exists, proceed with deletion
           await unlinkAsync(filePath);
           safeLog('deleteFile', `Successfully deleted file: ${filePath}`);
       } catch (err) {
-           // If file doesn't exist (ENOENT), log it but don't throw an error
+           // If file doesn't exist (ENOENT), it's already gone or never existed, which is fine.
            if (err.code === 'ENOENT') {
-               safeLog('deleteFile', `File not found, skipping deletion: ${filePath}`);
+               safeLog('deleteFile', `File not found (already deleted?), skipping: ${filePath}`);
            } else {
-               // For other errors (like permissions), re-throw
-               throw err;
+               // Log other errors (like permissions) but don't necessarily crash the cleanup
+               console.error(`[StorageService] Error during file deletion attempt for ${filePath}:`, err);
            }
       }
   } catch (error) {
-    // Log deletion errors but don't throw to prevent breaking cleanup process
-    console.error(`[StorageService] Error deleting file: ${filePath}`, error);
+     // Catch unexpected errors in the outer try logic
+     console.error(`[StorageService] Unexpected error in deleteFile for ${filePath}:`, error);
   }
 };
 
-/**
- * Clean up files associated with a submission ID after a TTL.
- * @param {string} submissionId - ID of submission to clean up
- * @returns {void} - Schedules cleanup, doesn't return Promise
- */
+// scheduleCleanup function
 export const scheduleCleanup = (submissionId) => {
-    const CLEANUP_DELAY = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    // Validate submissionId format briefly
+    if (!submissionId || typeof submissionId !== 'string' || !submissionId.startsWith('sub_')) {
+        console.warn(`[StorageService] Invalid submissionId format for cleanup scheduling: ${submissionId}`);
+        return;
+    }
+
+    const CLEANUP_DELAY = 24 * 60 * 60 * 1000; // 24 hours
     safeLog('scheduleCleanup', `Scheduling cleanup for submission ID: ${submissionId} in ${CLEANUP_DELAY / 1000 / 3600} hours.`);
 
-  // Schedule deletion
   setTimeout(async () => {
-    safeLog('scheduleCleanup', `Starting cleanup for submission ID: ${submissionId}`);
+    safeLog('scheduleCleanup', `Starting cleanup task for submission ID: ${submissionId}`);
     try {
-       await initStorage(); // Ensure temp dir exists before reading it
-      const files = await readdirAsync(TEMP_DIR);
+       await initStorage(); // Ensure temp dir logic has run
+       const files = await readdirAsync(TEMP_DIR);
 
-      // Find all files matching this submission ID prefix
-      const matchingFiles = files.filter(file => file.startsWith(submissionId));
-       safeLog('scheduleCleanup', `Found ${matchingFiles.length} files matching ${submissionId} for cleanup.`);
+       // Filter more carefully based on the ID prefix within the filename
+       const matchingFiles = files.filter(file => {
+          // Example filenames: results-sub_123.json, report-sub_123.md, sub_123-timestamp-original.docx
+          return file.includes(`-${submissionId}.`) || file.startsWith(`${submissionId}-`);
+        });
 
-      // Delete each matching file
-      const deletePromises = matchingFiles.map(file =>
-          deleteFile(path.join(TEMP_DIR, file))
-      );
+       safeLog('scheduleCleanup', `Found ${matchingFiles.length} files matching pattern for ${submissionId}.`);
 
-      await Promise.all(deletePromises); // Wait for all deletions
+       if (matchingFiles.length > 0) {
+          const deletePromises = matchingFiles.map(file => {
+              const fullPath = path.join(TEMP_DIR, file);
+              return deleteFile(fullPath); // Call deleteFile for each found file
+          });
+          await Promise.all(deletePromises);
+       }
 
-      safeLog('scheduleCleanup', `Completed cleanup for submission ${submissionId}`);
+       safeLog('scheduleCleanup', `Completed cleanup task for submission ${submissionId}`);
     } catch (error) {
       // Log errors during the cleanup process itself
-      console.error(`[StorageService] Error during scheduled cleanup for ${submissionId}:`, error);
+      console.error(`[StorageService] Error during scheduled cleanup task for ${submissionId}:`, error);
     }
   }, CLEANUP_DELAY);
 };
