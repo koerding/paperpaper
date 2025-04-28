@@ -1,5 +1,5 @@
 // File Path: src/components/ResultsDisplay.jsx
-// Fixed Document Assessment rendering, kept tooltip logs
+// Added explicit space after MnK tag span
 'use client'
 
 import { useState, useEffect } from 'react';
@@ -13,11 +13,10 @@ const buildRuleMap = () => {
     if (allRulesData?.rules && Array.isArray(allRulesData.rules)) {
         allRulesData.rules.forEach(rule => {
             if (rule.originalRuleNumber && rule.title) {
-                // Use the original rule number (as string) from rules.json as the key
                 map.set(String(rule.originalRuleNumber), rule.title);
             }
-            // Optional: Add handling for sub-rules if needed, but map by originalRuleNumber
         });
+        // Keep this log for initial verification
         console.log('[ResultsDisplay] Built rule title map dynamically:', map);
     } else {
         console.error('[ResultsDisplay] Failed to load or parse rules.json for tooltips.');
@@ -27,25 +26,26 @@ const buildRuleMap = () => {
 const ruleTitleMap = buildRuleMap();
 
 const getRuleTitle = (ruleNum) => {
-    const key = String(ruleNum); // Ensure lookup key is string
-    console.log(`[getRuleTitle] Looking up rule number: "${key}" (type: ${typeof key})`); // Keep log
+    const key = String(ruleNum);
+    // Keep log for debugging if needed, comment out later if tooltips work
+    // console.log(`[getRuleTitle] Looking up rule number: "${key}" (type: ${typeof key})`);
     const title = ruleTitleMap.get(key);
     if (!title) {
-        console.warn(`[getRuleTitle] No title found for rule number: "${key}" in dynamic map.`); // Keep log
+        console.warn(`[getRuleTitle] No title found for rule number: "${key}" in dynamic map.`);
     }
-    return title || 'Unknown Rule'; // Default value
+    return title || 'Unknown Rule';
 };
 
 // --- Component to render text with potential MnK tag and tooltip ---
 const FeedbackText = ({ text }) => {
     if (!text || typeof text !== 'string') { return <span>{text || ''}</span>; }
-    // Regex: Looks for MnK, 1 or 2 digits, optional colon, optional space at the START of the string
     const match = text.match(/^MnK(\d{1,2}):?\s*/);
     if (match) {
-        const ruleNum = match[1]; // The captured number string (e.g., "1", "10")
-        const tagText = match[0]; // The full matched tag (e.g., "MnK1: ")
-        console.log(`[FeedbackText] Matched tag: "${tagText}", Extracted ruleNum: "${ruleNum}"`); // Keep log
-        const ruleTitle = getRuleTitle(ruleNum); // Look up title using the extracted number string
+        const ruleNum = match[1];
+        const tagText = match[0];
+        // Keep log for debugging if needed, comment out later if tooltips work
+        // console.log(`[FeedbackText] Matched tag: "${tagText}", Extracted ruleNum: "${ruleNum}"`);
+        const ruleTitle = getRuleTitle(ruleNum);
         const remainingText = text.substring(tagText.length);
         return (
             <>
@@ -55,11 +55,12 @@ const FeedbackText = ({ text }) => {
                 >
                     MnK{ruleNum}
                 </span>
+                {' '} {/* <-- **** ADDED EXPLICIT SPACE **** */}
                 <span>{remainingText}</span>
             </>
         );
     }
-    return <span>{text}</span>; // Return original text if no tag found
+    return <span>{text}</span>;
 };
 
 
@@ -67,8 +68,8 @@ export default function ResultsDisplay({ results }) {
   const [activeTab, setActiveTab] = useState('analysis');
 
   useEffect(() => {
+     // Keep essential logs for verifying data structure
      console.log("[ResultsDisplay] Received results prop keys:", results ? JSON.stringify(Object.keys(results)) : "null/undefined");
-     // Add more detailed check if needed
      if(results){
         console.log("[ResultsDisplay] Checking data: DA keys:", results.documentAssessment ? Object.keys(results.documentAssessment) : 'N/A', "|| Recs count:", results.overallRecommendations?.length ?? 'N/A');
      }
@@ -76,10 +77,9 @@ export default function ResultsDisplay({ results }) {
 
   if (!results) { return ( <div className="text-center p-8 border rounded-lg"><p className="text-muted-foreground">No results available</p></div>) }
 
-  // Simple check if there's *any* relevant data to show in the main sections
   const hasDisplayableData = results.documentAssessment || results.overallRecommendations || results.majorIssues || results.statistics || results.abstract || results.sections;
 
-  // --- Helper function definitions ---
+  // Helper functions
    const getSeverityIcon = (severity) => {
        switch (severity) {
          case 'critical': return <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />;
@@ -108,7 +108,6 @@ export default function ResultsDisplay({ results }) {
         if (numScore >= 6) return 'bg-yellow-500';
         return 'bg-destructive';
     };
-  // --- End Helper Functions ---
 
 
   return (
@@ -117,7 +116,7 @@ export default function ResultsDisplay({ results }) {
       <div className="flex border-b"> <button onClick={() => setActiveTab('analysis')} className="px-4 py-2 border-b-2 border-primary font-medium">Paper Analysis</button> </div>
 
       {/* Download Links */}
-      <div className="flex justify-between items-center flex-wrap gap-2">
+       <div className="flex justify-between items-center flex-wrap gap-2">
           <h3 className="text-lg font-medium">Full Analysis Report</h3>
           <div className="flex space-x-2">
              {results.reportLinks && typeof results.reportLinks === 'object' && Object.entries(results.reportLinks).map(([key, url]) => (
@@ -126,13 +125,13 @@ export default function ResultsDisplay({ results }) {
           </div>
         </div>
 
-       {/* Fallback if no main results data */}
+       {/* Fallback */}
        {!hasDisplayableData && ( <div className="border rounded-lg p-6 bg-yellow-100 text-yellow-800 text-center"><p>Analysis data seems incomplete or missing.</p></div> )}
 
       {/* Analysis Content */}
       <div className="space-y-6">
 
-         {/* --- Document Assessment (FIXED RENDER) --- */}
+         {/* Document Assessment */}
          {results.documentAssessment && typeof results.documentAssessment === 'object' && Object.keys(results.documentAssessment).length > 0 ? (
             <div className="border rounded-lg overflow-hidden">
                 <div className="bg-muted/30 px-4 py-2 font-medium">Document Assessment</div>
@@ -144,7 +143,6 @@ export default function ResultsDisplay({ results }) {
                     const displayScore = formatScore(assessment.score);
                     const scoreColor = getScoreColor(displayScore);
                     const barBgClass = getScoreBarBgClass(displayScore);
-                    // *** This is the actual JSX for each item ***
                     return (
                       <div key={key} className="space-y-2">
                         <div className="flex justify-between items-baseline">
@@ -158,13 +156,10 @@ export default function ResultsDisplay({ results }) {
                         {assessment.recommendation && <p className="text-xs text-blue-600 pt-1"><span className='italic mr-1'>Recommend:</span><FeedbackText text={assessment.recommendation} /></p>}
                       </div>
                     );
-                    // *********************************************
                  })}
                 </div>
             </div>
          ) : null }
-         {/* --- End Document Assessment --- */}
-
 
          {/* Top Recommendations */}
          {results.overallRecommendations && Array.isArray(results.overallRecommendations) && results.overallRecommendations.length > 0 ? (
@@ -261,7 +256,7 @@ export default function ResultsDisplay({ results }) {
                           <div className="flex items-center space-x-2 mb-1"><FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" /><p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Paragraph {paragraphIndex + 1}</p></div>
                           <div className="text-sm leading-relaxed pl-6">{paragraph.text}</div>
                           {paragraph.summary && <div className="pl-6"><p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-1">Summary:</p><p className="text-sm italic text-muted-foreground">{paragraph.summary}</p></div>}
-                          {paragraph.evaluations && typeof paragraph.evaluations === 'object' && ( <div className="pl-6 pt-2"><p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Structure Assessment:</p><div className="flex flex-wrap gap-2"> {/* Structure Assessment Tags */} </div></div> )}
+                          {paragraph.evaluations && typeof paragraph.evaluations === 'object' && ( <div className="pl-6 pt-2"><p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Structure Assessment:</p><div className="flex flex-wrap gap-2"> {/* Tags */} </div></div> )}
                           {paragraph.issues && Array.isArray(paragraph.issues) && paragraph.issues.length > 0 && (
                             <div className="pl-6 pt-2">
                               <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Issues Found:</p>
