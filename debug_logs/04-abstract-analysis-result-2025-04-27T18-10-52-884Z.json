@@ -1,0 +1,26 @@
+{
+  "text": "As neuroscientists we want to understand how causal interactions and mechanisms within the brain give rise to perception, cognition, and behavior. It has become popular to estimate interactions from measured activity using statistical techniques that aim to estimate “functional connectivity”, and interpret these correlational estimates in causal terms. However, we argue that any given observed correlation can be explained by an infinite set of causal models that consider the unobserved variables. We show that the omitted variable bias equation makes this relation precise: as we only record low-dimensional signals from high-dimensional brains, the countless unobserved variables likely have more influence than the few observed ones. We argue that only brain perturbations allow approaching causality.",
+  "summary": "The abstract discusses the challenges of interpreting functional connectivity in neuroscience, emphasizing the limitations of correlational estimates due to unobserved variables and advocating for brain perturbations to approach causality.",
+  "issues": [
+    {
+      "issue": "The abstract introduces more than 2-3 new technical concepts, such as 'functional connectivity', 'causal models', and 'omitted variable bias equation', which may overwhelm the reader.",
+      "severity": "major",
+      "recommendation": "Limit the introduction of new technical concepts to 2-3 per paragraph to manage cognitive load."
+    },
+    {
+      "issue": "The abstract does not follow the context-content-conclusion structure clearly in each paragraph.",
+      "severity": "major",
+      "recommendation": "Ensure each paragraph starts with context, provides content, and ends with a conclusion to enhance readability."
+    },
+    {
+      "issue": "The abstract lacks a clear question-data-answer structure, particularly in the results section.",
+      "severity": "major",
+      "recommendation": "Reorganize the abstract to include a question at the beginning, followed by data or evidence, and conclude with an answer or key takeaway."
+    },
+    {
+      "issue": "The average sentence length is close to the upper limit, and some sentences are complex.",
+      "severity": "minor",
+      "recommendation": "Simplify sentence structures and ensure average sentence length remains comfortably under 25 words."
+    }
+  ]
+}

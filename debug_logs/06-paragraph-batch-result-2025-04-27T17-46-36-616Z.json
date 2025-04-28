@@ -1,0 +1,63 @@
+{
+  "evaluations": [
+    {
+      "text": "A continuum of perturbation approaches to study causal interactions in brain activity are available in the neurosciences that should motivate future developments [19]. Counterfactual, causal inference ideas can be used to assess the strength of evidence about causality that can be obtained with commonly used approaches. Considerations of the Bradford-Hill criteria, provide a starting point for future research on causality in neuroscience. These perturbation studies also come with limitations, e.g. sources of confounding and still limited understanding of involved mechanisms [73,74]. Istill for those studies However, perturbation and in particular (passive) brain stimulation techniques are currently as close as we can get to causality in neuroscience when employed in a randomized, adequately controlled and blinded way [75].",
+      "summary": "The paragraph discusses the availability and limitations of perturbation approaches in neuroscience for studying causal interactions.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Sentence length exceeds recommended average, with some sentences being complex.",
+          "severity": "major",
+          "recommendation": "Break down longer sentences into shorter, more manageable ones."
+        },
+        {
+          "issue": "Typographical error 'Istill' present.",
+          "severity": "minor",
+          "recommendation": "Correct the typographical error to improve readability."
+        }
+      ]
+    },
+    {
+      "text": "Emerging techniques for perturbations may confront us with new conceptual problems. Perturbation techniques such as neurofeedback training and brain computer interfaces (BCIs) may be seen as an approximation to direct perturbations [79], because they allow to entrain correlations between brain regions and test for desired behavioral changes and have thus been advocated as tools for trying to understand causality within the brain [80–82]. BCIs synchronized in multiple users (so called hyperscanning) provide a special use case that allows closed-loop control of neural synchrony. These developments have recently initiated debates about causal inferences that can be drawn from well-controlled BCI experiments [83–86]. As complex interventions BCIs entail various obvious confounders and require experiments with (often many) carefully designed control conditions [87]. Combining BCIs with brain stimulation techniques may circumvent some limitations of other approaches. Further, complementary invasive closed-loop optogenetic stimulation studies conducted in animals, where stimulation is triggered by learned neural activity patterns [88], may circumvent some of the confounders and provide converging evidence [19,89]. Conceptual work is needed, however, to obtain clarity about these interpretations.",
+      "summary": "The paragraph explores emerging perturbation techniques and their conceptual challenges, focusing on BCIs and their implications for causal inference.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Sentence length exceeds recommended average, with some sentences being complex.",
+          "severity": "major",
+          "recommendation": "Simplify complex sentences and break them into shorter ones."
+        }
+      ]
+    },
+    {
+      "text": "Lastly, clinical applications often use eC measures, not to quantify causal interactions but as a proxy for hard-to measure behavioral effects. Clinicians ask if interventions affect eC as “biomarkers”. Brain stimulation techniques can thus be “eC-navigated”, i.e. targets are defined based on eC measures that predict (individual) clinical outcomes [90]. Brain Computer interfaces (BCIs) can target eC measures using eC changes as readily optimizable targets [83,91]. eC may be the best quantitative biomarkers for intervention effects when tested in adequately designed randomized controlled trials. They may also enable a quest to understand if low-dimensional organization principles can approximate causality [2]. However, research based on eC biomarkers remain somewhat circular field where changes in low-dimensional space are used to justify low-dimensional assumptions (e.g. mean-field based eC between two brain regions). Thus, causal insight about eC biomarkers (e.g. when used in eC-navigated perturbations) will require converging evidence [19] across organisational levels of the nervous system (i.e. molecular mechanisms) [49] and, above all, tests based on perturbations.",
+      "summary": "The paragraph discusses the use of eC measures in clinical applications as proxies for behavioral effects and their implications for understanding causality.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Sentence length exceeds recommended average, with some sentences being complex.",
+          "severity": "major",
+          "recommendation": "Divide longer sentences into shorter, clearer ones to improve readability."
+        }
+      ]
+    }
+  ]
+}

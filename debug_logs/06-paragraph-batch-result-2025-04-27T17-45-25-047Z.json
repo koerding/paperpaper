@@ -1,0 +1,22 @@
+{
+  "evaluations": [
+    {
+      "text": "It has been argued that the definition of causality in neuroscience is ambiguous [4,19]. Whenever we refer to causal interactions in this opinion paper, we will use the counterfactual definition. A variable causally influences another variable if a perturbation of the first variable would induce a change in the activity of another variable [15,20]. This approximates what we mean as neuroscientists: if we say a neuron influences another neuron, we mean that perturbing the first (e.g. electrically) would affect the second and if we say that a region influences another, we mean that perturbing the first region (e.g. magnetically) would affect the second. Hence, causality has an intuitively clear definition (counterfactuals or perturbation) and we should demand our statistical approaches to be measured against it (although see also Gomez-Marin, 2017). While there is significant debate about adequate definitions of causality in contemporary philosophical literature [22–25], we argue that neuroscientists by and large use our definition and will underscore this point with the way these scientists make claims in their papers. After all, this interpretation is what allows making claims about mechanism and clinical targets.",
+      "summary": "The paragraph discusses the ambiguity of causality definitions in neuroscience, advocating for the counterfactual definition as it aligns with neuroscientific practices.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Average sentence length exceeds 25 words, with some sentences being complex.",
+          "severity": "major",
+          "recommendation": "Break down longer sentences into shorter ones to improve readability and manage cognitive load."
+        }
+      ]
+    }
+  ]
+}

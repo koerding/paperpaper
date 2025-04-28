@@ -1,0 +1,88 @@
+{
+  "evaluations": [
+    {
+      "text": "Omitted variable biases will make causal inference impossible if there are many unobserved dimensions relative to the observed dimensions. For instance, when analyzing spike data, there are far more unobserved variables than observed variables. When we record a few hundred neurons [52], the number of recorded neurons is a vanishingly small subset of all neurons. We have little reason to assume that the recorded neurons are much more important than the un-recorded neurons. As each neuron receives inputs from so many other un-recorded neurons, we should expect that the parts of neural activity driven by unobserved neurons are arbitrarily larger than the parts coming from observed neurons. In other words, the confounding signal should be many orders of magnitude more important than those coming from observed data. As such, we should not expect that causal inference is possible.",
+      "summary": "The paragraph discusses the challenge of omitted variable biases in causal inference due to the large number of unobserved variables compared to observed ones in neural data.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "We might feel that causality may happen at a given scale, which would make the argument about unobserved dimensions invalid and allowing a multi-scale definition of interactions. The argument given is often the analogy to statistical physics: while understanding the interaction between individual gas molecules becomes quickly hopeless, a large set of gas atoms can be well understood in terms of temperature and pressure. However, this analogy quickly breaks down when applied to neurophysiology. Every neuron is special in the sense that they do not interact with random neurons, but with a largely fixed set, or worse, a set that changes through neuroplasticity. The justification of averaging over molecules is often perfectly fine in statistical physics. However, whether this this logic works in neuroscience remains an open question.",
+      "summary": "The paragraph critiques the analogy between statistical physics and neurophysiology, arguing that neurons interact in complex, non-random ways unlike gas molecules.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "When analyzing imaging data such as fMRI, or LFP, EEG, or MEG, there are also far more unobserved variables than observed variables. Within each signal source, we can, in some abstraction, observe the sum of neural activity. However, the same measured activity can be realized by any combination of individual activities rendering a solution of the inverse problem (signals 🡪 neuronal spike trains) infeasible. The activity of neurons which are orthogonal to our signal, can span arbitrary dimensions, related to movement, memory, thought or neuronal communication. Importantly, dense physiological recordings in small areas suggest that countless variables are represented (e.g. movement related signals in V1; Musall et al., 2018; Stringer et al., 2018). The signals that we can measure are arbitrarily low-dimensional relative to the full dimensionality of communication in the brain. As such we are still in the situation where we have a number of confounders that is many orders of magnitude larger than the number of measured variables. This again puts us into the domain where causal inference should be impossible.",
+      "summary": "The paragraph highlights the challenge of inferring causality from imaging data due to the overwhelming number of unobserved variables compared to observed ones.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Some sentences exceed the recommended length, increasing cognitive load.",
+          "severity": "major",
+          "recommendation": "Break longer sentences into shorter, more manageable ones."
+        }
+      ]
+    },
+    {
+      "text": "Macroscopic recording (such as fMRI) is what, to many people, hides the underlying logical problems of confounding. We record from a number of voxels or pixels. In many cases, we cover the whole brain. So where do the confounders hide? Within each voxel there are generally millions of neurons that form billions of synapses [50]. However, we only observe the macroscopic activities, say the sum of all activities. This means that all the dimensions that are uncorrelated to this sum continue to exist and continue to be transmitted to other voxels. In other words, there is nothing about the setting that removes confounders, unless the voxel activity itself is the confounder. Given that the majority of dimensions is unobserved, the probability of recording the confounder is vanishingly small.",
+      "summary": "The paragraph discusses how macroscopic recordings like fMRI obscure the presence of confounders due to the vast number of unobserved neuronal activities.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "It has been argued that statistical approaches may still uncover low-dimensional organization between brain regions [2]. The argument is that if the brain’s activity was very low dimensional and aligned with recorded dimensions [55], then recording from a small number of voxels or neurons may be equivalent to recording all of them. Such view assumes that we believe that the composition of the activity within a voxel, for instance, does not matter but just the measured sum of (unobserved) individual activities. We thereby effectively subscribe to a strong mean-field view, which is dominant among eC methodology [56–59]. However, within each voxel, we find neurons of countless tuning properties [60] that describe how neurons are affected by a stimulus dimension such as color. On a theoretical level, it thus becomes clear how mean-field or ensemble averaging techniques fall risk of violating ergodicity principles as a key assumption of cause-effect inference, i.e. that the mean response of representative samples allow predictions about individual members of those samples [61]. On a practical level, model inferences becomes easily biased when algorithms that compute eC based on mean-field variables (e.g. the average activity within several voxels informed by some parcellation) miss relevant nodes [45,51]. Lastly we argue that effectively, mean-field studies set up simulations that unfold in low-dimensional spaces and then show that they can be recovered in low-dimensional spaces, rendering the approach somewhat circular [56–59]. To our knowledge no study has shown that networks that compute like brains can be approximated by the underlying mean-field approximation. Barring such a study we should assume that mean-field is not a meaningful approximation of brain computation.",
+      "summary": "The paragraph critiques the mean-field approach in neuroscience, arguing it may not accurately represent brain computation due to its assumptions and potential biases.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Some sentences exceed the recommended length, increasing cognitive load.",
+          "severity": "major",
+          "recommendation": "Break longer sentences into shorter, more manageable ones."
+        }
+      ]
+    },
+    {
+      "text": "Typically applied eC algorithms are unable to disentangle correlational from causal sources of variability regardless their mathematical sophistication [3,61]. Causal inference algorithms that work with observational data are generally built on the assumption of causal sufficiency, which boils down to there being no unobserved confounders (although see Ranganath and Perotte, 2018; Wang and Blei, 2018) – this assumption within neuroscience is that all neurons are recorded from. Without these assumptions we can at best produce families of potential models and if any pair of recorded variables is confounded then this family will contain all models [64]. Recording only a few variables in a densely interacting causal system generally renders causal inference impossible [20,65].",
+      "summary": "The paragraph discusses the limitations of eC algorithms in distinguishing correlation from causation due to the assumption of causal sufficiency.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    }
+  ]
+}

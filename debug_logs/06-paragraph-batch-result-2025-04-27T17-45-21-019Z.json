@@ -1,0 +1,82 @@
+{
+  "evaluations": [
+    {
+      "text": "Functional connectivity research has become a substantial part of neuroscientific literature in recent years [1]. Typically studies uses observational methods to estimate “connectivity” via statistical techniques that aim to infer interactions from continuous valued brain signals [2,3]. The approaches that we call estimated connectivity (eC) in this paper convert measured signals into a statistical estimate of “connectivity.”",
+      "summary": "Introduction to functional connectivity research and estimated connectivity (eC).",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "We argue that the eC field uses language that suggests causality and its results aim to drive downstream research as if it was causality. Terms used to describe its methodology include Granger Causality, functional connectivity (FC), information flow, effective connectivity and dynamic causal models [3]. The field does this despite the fact that other terms such as improvement in predictive power, correlations, conditional correlations, and model comparison can denote more precisely what is actually done. The language effectively redefines causality related terms in the English language. Connectivity implies a connection between two places. Causality implies cause and effect. Flow implies that something moves from one place to another. This set of re-definitions gives rise to the problem that eC approaches are often misunderstood by practicing neuroscientists [4].",
+      "summary": "Discussion on the misleading use of causality-related language in the eC field.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Some sentences exceed 25 words, increasing cognitive load.",
+          "severity": "minor",
+          "recommendation": "Break longer sentences into shorter ones to improve readability."
+        }
+      ]
+    },
+    {
+      "text": "This misleading redefinition profoundly affects downstream science. Scientists write about connections within the brain minimizing the wiring length along which signals need to travel [5,6], but while the brain may want to minimize wiring length, it pays no price for correlations. They write about stimulation to control the network [7], which requires interactions to be causal. They write about “using causal FC methods to identify network mechanisms underlying cognitive computations in the human brain” [8], which implies that prediction is a sufficient (and not just necessary) criterion to justify causal inferences. They write about mechanistic interference to cure diseases [9], which again requires causality. Or they write about regions that “cause more exchange of causal information” [10]. These examples show how correlations are assumed to indicate causality. Specifically, eC is often discussed as if it did reveal an approximate understanding of causality, and much of it is due to misleading use of words that imply causality in lay English and merely refer to algorithm properties in statistics.",
+      "summary": "Impact of misleading causality language on scientific interpretations and assumptions.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Some sentences exceed 25 words, increasing cognitive load.",
+          "severity": "minor",
+          "recommendation": "Break longer sentences into shorter ones to improve readability."
+        }
+      ]
+    },
+    {
+      "text": "We ourselves fell for this interpretation. We wrote in 2008 “ […] [estimated connectivity] methods have become staples of neural data analysis, and have revealed a great deal about the interactions between cortical and subcortical structures.” [11]. We could simply have said that models that use other activities as independent variables are good predictors. With LFPs it was argued that “[…] the relative weight of feedforward and lateral inputs in visual cortex is not fixed, but rather depends on stimulus contrast.” [12]. For EEG and MEG power coherence analyses, it was advocated that “[…] amplitude correlation is an informative index of the large-scale cortical interactions that mediate cognition.” [13]. For fMRI data, other authors reported “[…] changes in the architecture of functional connectivity patterns that promote learning from initial training through mastery of a simple motor skill.” [14]. However, all these approaches only reach level one in Pearl’s hierarchy of causation [15,16] – they describe correlations. While the impossibility of making causal statements in such situations is well known [17,18], the field continues to make them. Indeed, a recent perspective paper by published by leading researchers in the eC field explicitly states that it strives causality, predominantly by refining eC measures [2].",
+      "summary": "Authors' reflection on their own past misinterpretations and the persistence of causality claims.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Some sentences exceed 25 words, increasing cognitive load.",
+          "severity": "minor",
+          "recommendation": "Break longer sentences into shorter ones to improve readability."
+        }
+      ]
+    },
+    {
+      "text": "Algorithms claiming eC have been used exhaustively when analyzing brain data with the hope of getting at causality. Using a more accurate terminology could help in the interpretation and, clarify that our results remain foremost descriptive: Interregional, or interneural signal correlations captures what most techniques measure.",
+      "summary": "Call for accurate terminology to clarify the descriptive nature of eC results.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    }
+  ]
+}

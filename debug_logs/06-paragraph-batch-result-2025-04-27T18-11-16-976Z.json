@@ -1,0 +1,62 @@
+{
+  "evaluations": [
+    {
+      "text": "A rich body of literature has described eC techniques: some techniques utilize granger causality [26], other techniques talk about information flow [27,28]. Another class more directly talks about Dynamic Causal Modeling [29]. Within the neuroimaging community the term effective connectivity (EC) is often used when causality is explicitly claimed but within our definition, they fall into our more expansive definition of eC. We will argue that all these approaches share the same logical weakness – statistical confounding. This problem is often acknowledged by the statisticians developing these algorithms and yet generally ignored by the experimentalists using them. Yet, the lure of extracting causality from observational data is so powerful, that we cannot avoid feeling the pull of it and have ourselves referred to correlations in connectivity terms [11].",
+      "summary": "The paragraph discusses various eC techniques and their common issue of statistical confounding.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "Average sentence length exceeds 25 words.",
+          "severity": "major",
+          "recommendation": "Break down longer sentences into shorter ones to improve readability."
+        },
+        {
+          "issue": "Lack of structural parallelism in listing techniques.",
+          "severity": "minor",
+          "recommendation": "Use a consistent grammatical structure when listing different eC techniques."
+        }
+      ]
+    },
+    {
+      "text": "The field has also developed techniques for estimating the strength of connections between neurons based on simultaneous spike recordings. The underlying idea is that we want to predict each neuron’s spiking probability based on the activity of other observed neurons, typically expressed in form of mechanistic claims [30,31]. And indeed, if we record all neurons, they are noisy, and we know that from their transfer function we should be able to estimate the strength and nature of causal interactions [32]. These studies, too, were generally interpreted in causal terms [11,30]. Again, the lure of causality is so powerful that it affects interpretations.",
+      "summary": "The paragraph describes techniques for estimating neuronal connections and their causal interpretations.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "Within the eC community one can delineate two main philosophies. Some authors use eC to describe replicable network properties of functional and anatomical neural data without directly attributing causal significance to interregional correlations [33–35]. Others interpret changes in parameter estimates in more explicitly causal terms such as contributing factors of pathophysiological processes [36,37], biological mechanisms in learning and cognition in healthy [38,39], as vulnerability mechanisms to develop certain disorders [40,41], or in terms neuroplasticity in the functional re-organization of the brain [37,42]. Common to both groups is the focus on making mechanistic claims. Indeed, recent bibliometric research suggests that the study of eC has become a substantial area in neuroimaging [1], and it is thus is important to obtain clarity about its interpretation. We argue, however, that neuroscientists systematically interpret their correlational findings as causal by the misleading use of words that suggest mechanisms and causality.",
+      "summary": "The paragraph outlines two main philosophies in the eC community and the common issue of misinterpreting correlational findings as causal.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "Average sentence length exceeds 25 words.",
+          "severity": "major",
+          "recommendation": "Shorten sentences to improve readability and manage cognitive load."
+        },
+        {
+          "issue": "Lack of structural parallelism in listing interpretations.",
+          "severity": "minor",
+          "recommendation": "Use a consistent grammatical structure when listing different interpretations."
+        }
+      ]
+    }
+  ]
+}

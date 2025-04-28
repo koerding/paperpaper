@@ -1,0 +1,64 @@
+{
+  "evaluations": [
+    {
+      "text": "What is an adequate nomenclature for causality inferences in neuroscience that reflects the different degree of uncertainty associated with individual approaches?",
+      "summary": "The paragraph questions the appropriate terminology for causality inferences in neuroscience.",
+      "evaluations": {
+        "cccStructure": false,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "The paragraph lacks a content and conclusion, only posing a question.",
+          "severity": "major",
+          "recommendation": "Expand the paragraph to include context and a potential conclusion or implication of the question."
+        }
+      ]
+    },
+    {
+      "text": "For which questions do we need causality? For instance, clinical research may find biomarkers that indicate a disease state but are not part of the causal chain or about which we have little mechanistic insight. Yet, they may be suitable to predict disease trajectories or treatment response.",
+      "summary": "The paragraph discusses the necessity of causality in clinical research, particularly regarding biomarkers.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "What are the counterfactual inference boundaries for perturbation approaches and how can these be considered with adequate analyses? There are several approaches that may be useful, for instance tests and simulation studies that investigate under which circumstances there is likely confounding by Simpson’s paradox. In neural systems that are fully described, targeted perturbations can be used to probe whether algorithms can reconstruct expected patterns.",
+      "summary": "The paragraph explores the boundaries of counterfactual inference in perturbation approaches and suggests methods to address confounding factors.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "Which mechanisms underly effects of perturbational approaches such as brain stimulations and BCIs? How can study protocols for combined perturbational approaches be optimized to yield converging causal mapping?",
+      "summary": "The paragraph questions the mechanisms of perturbational approaches and how protocols can be optimized for causal mapping.",
+      "evaluations": {
+        "cccStructure": false,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "The paragraph lacks a content and conclusion, only posing questions.",
+          "severity": "major",
+          "recommendation": "Provide context and potential conclusions or implications for the questions posed."
+        }
+      ]
+    }
+  ]
+}

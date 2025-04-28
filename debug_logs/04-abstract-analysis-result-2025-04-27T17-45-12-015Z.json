@@ -1,0 +1,26 @@
+{
+  "text": "As neuroscientists we want to understand how causal interactions and mechanisms within the brain give rise to perception, cognition, and behavior. It has become popular to estimate interactions from measured activity using statistical techniques that aim to estimate “functional connectivity”, and interpret these correlational estimates in causal terms. However, we argue that any given observed correlation can be explained by an infinite set of causal models that consider the unobserved variables. We show that the omitted variable bias equation makes this relation precise: as we only record low-dimensional signals from high-dimensional brains, the countless unobserved variables likely have more influence than the few observed ones. We argue that only brain perturbations allow approaching causality.",
+  "summary": "The abstract discusses the challenges in understanding causal interactions in the brain using functional connectivity estimates, highlighting the limitations due to unobserved variables and suggesting brain perturbations as a more reliable approach to infer causality.",
+  "issues": [
+    {
+      "issue": "Average sentence length exceeds 25 words, with one sentence containing 39 words.",
+      "severity": "minor",
+      "recommendation": "Break longer sentences into shorter ones to improve readability and manage cognitive load."
+    },
+    {
+      "issue": "The abstract introduces more than 2-3 new technical concepts, such as 'functional connectivity', 'causal models', and 'omitted variable bias equation'.",
+      "severity": "major",
+      "recommendation": "Limit the introduction of new technical concepts to 2-3 per paragraph to reduce cognitive load."
+    },
+    {
+      "issue": "The paragraph does not follow the context-content-conclusion structure effectively.",
+      "severity": "major",
+      "recommendation": "Reorganize the paragraph to clearly establish the context, provide detailed content, and conclude with a key takeaway."
+    },
+    {
+      "issue": "Parallelism is not effectively used; similar concepts are not presented using similar grammatical structures.",
+      "severity": "minor",
+      "recommendation": "Use consistent grammatical structures when presenting similar concepts to enhance readability."
+    }
+  ]
+}

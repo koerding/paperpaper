@@ -1,0 +1,142 @@
+{
+  "evaluations": [
+    {
+      "text": "Let us assume that there is a set of variables x that are observed. We want to ask what the causal influence of x is on y. Both x and y may be neural activities that relate in a linear way to each other:",
+      "summary": "Introduction of variables x and y and their potential causal relationship.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "+z𝛿  (1)",
+      "summary": "Equation representing the relationship between x, y, and z.",
+      "evaluations": {
+        "cccStructure": false,
+        "sentenceQuality": false,
+        "topicContinuity": false,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "Equation presented without context or explanation.",
+          "severity": "critical",
+          "recommendation": "Provide context or integrate into a paragraph with explanation."
+        }
+      ]
+    },
+    {
+      "text": "where  is the weight for the influence that signal x has on y. Further, 𝛿 is the weight of the noise term z, which includes other variables that we do not observe but that also have a causal influence on x and y. These unobserved variables introduce OVB onto the causal estimate of the influence of x and y. Importantly, OVB cannot be overcome by more data, it exists in the limit of infinite sized datasets. Further, following a simple back of the envelope calculation for the relevant effects studied in the FC and EC fields, OVB should, be orders of magnitude larger than the real signals, entirely rendering the techniques useless for their typical applications.",
+      "summary": "Explanation of weights and the impact of unobserved variables on causal estimates.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Sentence length exceeds recommended average.",
+          "severity": "major",
+          "recommendation": "Break down longer sentences into shorter, clearer statements."
+        }
+      ]
+    },
+    {
+      "text": "When we apply a linear regression model, we typically ignore z and calculate as a mean square error estimate:",
+      "summary": "Introduction to the application of linear regression ignoring z.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "(2)",
+      "summary": "Placeholder for an equation.",
+      "evaluations": {
+        "cccStructure": false,
+        "sentenceQuality": false,
+        "topicContinuity": false,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "Equation presented without context or explanation.",
+          "severity": "critical",
+          "recommendation": "Provide context or integrate into a paragraph with explanation."
+        }
+      ]
+    },
+    {
+      "text": "However, once we take the noise (z) into account, we can insert the equation for y (1) into the equation for :",
+      "summary": "Introduction to considering noise in the regression model.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "(3)",
+      "summary": "Placeholder for an equation.",
+      "evaluations": {
+        "cccStructure": false,
+        "sentenceQuality": false,
+        "topicContinuity": false,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "Equation presented without context or explanation.",
+          "severity": "critical",
+          "recommendation": "Provide context or integrate into a paragraph with explanation."
+        }
+      ]
+    },
+    {
+      "text": "In other words, the existence of unobserved variables introduces a bias that persists, regardless the amount of data (X). There is no reason to believe that the  contribute more variance than the . The correlations between x and z are typically relatively high [51]. In fact, neural signals recorded in neuroscience usually entail millions more unobserved signals than observed signals [49]. Hence, the signal from the z term is expected to be arbitrarily larger than the signal from x and statistical techniques are highly susceptible to OVB when applied to merely observational data.",
+      "summary": "Discussion on the persistent bias due to unobserved variables and its implications.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Sentence length exceeds recommended average.",
+          "severity": "major",
+          "recommendation": "Break down longer sentences into shorter, clearer statements."
+        }
+      ]
+    },
+    {
+      "text": "As the neural dimensionality (or speed of processing) in each measured signal increases, the temporal resolution decreases, the noise (or non-communication related signal) increases and hence the idea of extracting causality from observation becomes hopeless. Importantly, this is not a problem that can simply be solved by recording data from more subjects. This is a case where a problem can fundamentally not be solved.",
+      "summary": "Conclusion on the limitations of extracting causality due to noise and dimensionality.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    }
+  ]
+}

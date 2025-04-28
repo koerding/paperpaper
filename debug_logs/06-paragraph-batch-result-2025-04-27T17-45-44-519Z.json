@@ -1,0 +1,70 @@
+{
+  "evaluations": [
+    {
+      "text": "The confounding problem is the existence of unobserved variables that affect the observed variables (both a potential upstream population A and a potential downstream population B) in a way that generally makes the estimation of causal effects impossible. It is easy to see why it is impossible to use any statistical techniques to estimate causal interactions in the presence of unobserved confounding. Let us say there is a causal influence from A to B. In this case, it is always possible to construct a common input C which will produce the same effect on B that A would have (e.g. by replicating A and feeding into C). Similarly, if there is no influence from A to B it is always possible to use a confounder to change A and B so that they now look like they do interact. Clearly there is an infinite set of potential causal interpretations of the same partially observed signals.",
+      "summary": "The paragraph discusses the confounding problem in causal inference, highlighting the impossibility of estimating causal effects due to unobserved variables.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "For example, let us say we are interested in the interactions between two neurons. Further, let us assume that there is a third neuron (confounder) that activates both neurons. In that case, if we see a correlation between the neurons we cannot know if it is due to the neurons interacting directly or through an induced interaction by the unobserved neuron. More generally, any joint distribution between two neurons could be induced by a single third neuron. Unobserved neurons or information can act as confounders for the inference of eC, threatening the validity of the results. This confounding problem is central to the statistical field of causal inference and it is generally acknowledged that, in typical situations, unobserved confounders render inferences about causality impossible.",
+      "summary": "The paragraph provides an example of confounding in neuron interactions, emphasizing the challenge it poses to causal inference.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "We want to use Simpson's paradox to highlight the threat of confounding [43], in which unobserved interaction can either cancel out main effects, or artificially induce spurious main effects. Let us say that there are two brain states (e.g. related to two levels of attention), and that one state is associated with high activity of neuron A and low activity of neuron B while another is associated with low activity of neuron A and high activity of neuron B. But let us say that there is a positive instantaneous causal influence from one on the other. If we do not know the brain state (confounded) we may conclude that neuron A has a negative influence on the activity of neuron B. However, if we do know the brain state, we correctly see that A increases the activity of neuron B (Figure 1). This paradox shows how confounders with relevant structure can arbitrarily influence the resulting eC and can effectively destroy it.",
+      "summary": "The paragraph uses Simpson's paradox to illustrate how confounding can mislead causal inference in brain state analysis.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "Indeed, in certain neuroimaging datasets it is possible to directly observe Simpson’s paradox. For instance, the choice of analysis parameters, such as seed regions, and the network they belong to, may mediate whether different FC methods yield similar, or orthogonal results [44]. Moreover, functional brain parcellations reconfigure based on the brain state [45].",
+      "summary": "The paragraph discusses the observation of Simpson's paradox in neuroimaging datasets and the impact of analysis parameters.",
+      "evaluations": {
+        "cccStructure": false,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "The paragraph lacks a clear conclusion or key takeaway.",
+          "severity": "major",
+          "recommendation": "Add a concluding sentence to summarize the implications of the observations."
+        }
+      ]
+    },
+    {
+      "text": "These issues would maybe be a minor problem if we had reasons to believe that confounding is weak, i.e. if there were few unobserved confounders and that they would be weak. However, we will demonstrate that we have no reason to believe so, and that the number of such confounders is in fact larger by orders of magnitude (and their strength arguably roughly the same) than the observed signals. We will argue, based on the omitted variable bias equation (Box 2) that it is highly unlikely that an algorithm could identify the network of causal interactions.",
+      "summary": "The paragraph argues that confounding is a significant issue due to the large number of strong unobserved confounders.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    }
+  ]
+}

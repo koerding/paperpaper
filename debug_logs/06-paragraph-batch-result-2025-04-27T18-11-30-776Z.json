@@ -1,0 +1,34 @@
+{
+  "evaluations": [
+    {
+      "text": "Neuroimaging datasets (e.g. fMRI and MEG) are affected by obvious confounders including head motion and physiological processes. One dominant view is that correcting for obvious confounders improves causal inference irrespective of unobserved confounders [2]. However, for each obvious external controllable confounder there are countless internal unobservable ones [46]. Hence, while we agree that correcting for observed confounders improves the prediction of models, we argue that such view remains speculative when it comes to inferring causality for theoretical reasons that we lay out below.",
+      "summary": "The paragraph discusses the impact of confounders on neuroimaging datasets and questions the effectiveness of correcting for observed confounders in causal inference.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "For better illustration, we refer to a linear system (see Box 2). However, we note that OVB equally applies to nonlinear systems [47,48] as, the existence of unobserved variables introduces a bias that persists, regardless the amount of data. Given the nature of recorded brain signals, there is no reason to believe that the observed variables (e.g. average activation in a voxel) should have more causal influence than the unobserved variables (e.g. any represented variable orthogonal to this). Signals recorded in neuroscience usually entail millions more unobserved signals than observed signals [49,50]. Hence, the unobserved noise is expected to be arbitrarily larger than the signal obtained from observed neural activity. Therefore, statistical techniques will fail to reveal causal insights from correlations unless we have strong additional prior knowledge about the system and its dynamics.",
+      "summary": "The paragraph explains the persistence of omitted variable bias in both linear and nonlinear systems, emphasizing the dominance of unobserved variables in neuroscience data.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "One sentence exceeds 40 words, impacting readability.",
+          "severity": "major",
+          "recommendation": "Break down long sentences into shorter ones to improve clarity and manage cognitive load."
+        }
+      ]
+    }
+  ]
+}

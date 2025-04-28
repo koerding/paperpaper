@@ -1,0 +1,58 @@
+{
+  "documentAssessment": {
+    "titleQuality": {
+      "score": 8,
+      "assessment": "The title effectively communicates the central contribution regarding misleading causal statements in functional connectivity research.",
+      "recommendation": "Ensure the title remains focused on the central theme of causality misinterpretation."
+    },
+    "abstractCompleteness": {
+      "score": 7,
+      "assessment": "The abstract provides a clear overview of the research problem and approach but could better emphasize the broader significance.",
+      "recommendation": "Include a stronger statement on the broader implications of the findings."
+    },
+    "introductionStructure": {
+      "score": 6,
+      "assessment": "The introduction sets the context and identifies the gap but could more explicitly state the importance of addressing this gap.",
+      "recommendation": "Enhance the introduction by clearly articulating the significance of the research gap."
+    },
+    "resultsOrganization": {
+      "score": 5,
+      "assessment": "The results are presented with some logical flow, but there are issues with clarity and coherence in connecting findings to the central claim.",
+      "recommendation": "Reorganize the results to ensure a clear, logical progression that directly supports the central claim."
+    },
+    "discussionQuality": {
+      "score": 6,
+      "assessment": "The discussion summarizes key findings but lacks depth in addressing limitations and broader impacts.",
+      "recommendation": "Expand on the limitations and discuss the broader impact of the findings more thoroughly."
+    },
+    "messageFocus": {
+      "score": 7,
+      "assessment": "The paper maintains a focus on the central theme of causality misinterpretation but occasionally diverges into secondary topics.",
+      "recommendation": "Ensure all sections consistently reinforce the central message without unnecessary digressions."
+    },
+    "topicOrganization": {
+      "score": 5,
+      "assessment": "The paper has issues with topic organization, with some sections containing unrelated content and multiple topic shifts.",
+      "recommendation": "Consolidate related ideas and minimize topic shifts to improve coherence and flow."
+    }
+  },
+  "majorIssues": [
+    {
+      "issue": "The results section lacks a clear logical sequence that builds towards the central claim.",
+      "location": "Results section",
+      "severity": "major",
+      "recommendation": "Reorganize the results to follow a logical sequence that directly supports the central claim, using clear transition statements."
+    },
+    {
+      "issue": "The discussion does not adequately address the limitations of the study.",
+      "location": "Discussion section",
+      "severity": "major",
+      "recommendation": "Explicitly acknowledge and discuss the limitations of the study, providing context and suggesting future research directions."
+    }
+  ],
+  "overallRecommendations": [
+    "Reorganize the results section to ensure a logical flow that supports the central claim.",
+    "Enhance the discussion by thoroughly addressing study limitations and broader impacts.",
+    "Improve topic organization by consolidating related ideas and minimizing unnecessary topic shifts."
+  ]
+}

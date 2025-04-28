@@ -1,0 +1,32 @@
+{
+  "evaluations": [
+    {
+      "text": "We have reviewed why eC approaches cannot meaningfully get at causality due to massive confounding from unobserved variables – correlations are not causation and omitted variables produce biases. However, this circumstance does not imply that trying to understand the joint dynamics of many neurons or brain areas is not interesting. For example, looking at the brain in lower dimensional projections may allow us to see its invariances [92–94]. Interregional correlations may have no causal meaning, but they may allow us to derive biomarkers [95–97]. To which degree these reflect neuronal interactions, however, remains subject to future perturbational, well controlled studies. Understanding joint statistics of neurons or brain networks is highly informative, however, statements about joint statistics are not meaningful statements about causality – it is important to be clear about the statements permitted by any one approach. In cases where these cannot be substantiated, only descriptive approaches [98] non-causal explanations are informative and meaningful [25,99]. Lastly, we note that there may be also a sociological dimension to the raised issues: authors often seem incited to make causal statements using filler verbs (e.g. to drive, alter, promote) as a form of storytelling [21] to leverage the perceived attractiveness of their work. Instead of committing this fallacy, we encourage researchers to question the causal validity of statements, probe underlying assumptions and test counterfactual inference boundaries (see Outstanding questions).",
+      "summary": "The paragraph discusses the limitations of eC approaches in establishing causality, the potential value of understanding joint dynamics of neurons, and the sociological factors influencing causal claims in research.",
+      "evaluations": {
+        "cccStructure": false,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "The paragraph lacks a clear context-content-conclusion structure.",
+          "severity": "major",
+          "recommendation": "Reorganize the paragraph to clearly introduce the topic, provide supporting content, and conclude with a key takeaway."
+        },
+        {
+          "issue": "Average sentence length exceeds 25 words, and some sentences are complex.",
+          "severity": "major",
+          "recommendation": "Break down longer sentences into shorter, more manageable ones to improve readability."
+        },
+        {
+          "issue": "The paragraph lacks structural parallelism, particularly in presenting examples and recommendations.",
+          "severity": "minor",
+          "recommendation": "Use parallel grammatical structures when listing examples or recommendations to enhance readability."
+        }
+      ]
+    }
+  ]
+}

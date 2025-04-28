@@ -1,0 +1,57 @@
+{
+  "evaluations": [
+    {
+      "text": "We may ask if causal inference may work for exhaustively recorded (i.e., completely observed) neural networks, for instance in small animals or engineered systems. In the worm c. elegans, aplysia, drosophila, larval zebrafish [66] or microprocessors [67] recording all “neurons” at high temporal precision is possible. For instance, in very small simulated systems that contain only a few interconnected neurons we may find that correlation approaches true, causal connectivity (https://compneuro.neuromatch.io/tutorials/W3D5_NetworkCausality/student/W3D5_Tutorial2.html). However, once the network becomes larger (or, equivalently, there being stronger spatial autocorrelation, estimated and true connectivity diverge, and model identification becomes impossible (Figure 2). Likewise, model inference based on merely observational data (i.e. network correlations) becomes impossible in larger, interconnected systems. This is because mismatches between the generative system and the inference model (i.e. model mis-specification) become inevitable , and highly correlated, yet not directly coupled activity (as typically observed in recurrent networks) will be easily mistaken for direct connections [51]. This underdetermination (or “missing region” problem and the bias it introduces is well known [29,51] and only controlled perturbations can prevent such systematic inference errors [51,68].",
+      "summary": "The paragraph discusses the challenges of causal inference in neural networks, particularly as network size increases.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": false
+      },
+      "issues": [
+        {
+          "issue": "Some sentences exceed 40 words, increasing cognitive load.",
+          "severity": "major",
+          "recommendation": "Break long sentences into shorter ones to improve readability."
+        },
+        {
+          "issue": "Lack of structural parallelism in presenting examples.",
+          "severity": "minor",
+          "recommendation": "Use a consistent structure when listing examples or concepts."
+        }
+      ]
+    },
+    {
+      "text": "As the impossibility of causal inference from subsampled data may feel counter-intuitive we want to spell out the problem a bit more. Let us assume we are interested in the connections between two signals, e.g. voxels B and C. However, we note the brain’s real dynamics are characterized by the activity of up to more than 5 million neurons contained in these voxels [50]. In its simplest form, these can be modelled as a linear system that includes a noise term for unexplained variance. As the neural dimensionality (or speed of processing) in each measured signal increases, the noise (or non-communication related signal) increases and hence the idea of extracting causality from observation becomes hopeless. Importantly, this is not a problem that can simply be solved by recording data from more observations. Increasing data can only decrease variance errors but not bias errors, which result from correlated neural activities that are not averaged out by merely increasing data [51]. Bias errors will persist unless perturbations are applied [51].",
+      "summary": "The paragraph explains why causal inference from subsampled data is problematic, emphasizing the role of noise and bias errors.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": true,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": []
+    },
+    {
+      "text": "For all methods that we have at our disposal to run functional connectivity analyses, the signals are few relative to the many unobserved variables. In these settings, interactions between measured signals should describe much less variance than the interactions between unobserved variables. While the examples we discuss here focus on neuron-to-neuron interactions, additional complexity arises from interactions with other cell types such as glia. Just like in Simpson’s paradox, the interactions between such unobserved variables can arbitrarily affect the estimates of interactions between measured signals [49]. As the neural dimensionality in each measured signal increases, the noise (or non-communication related signal) increases and interactions between unobserved variables can arbitrarily affect the estimates of interactions between measured signals, resulting in OVB [68]. Hence, all reviewed statistical methods are ultimately susceptible to OVB [48,69,70].",
+      "summary": "The paragraph discusses the limitations of functional connectivity analyses due to unobserved variables and their impact on observed signal interactions.",
+      "evaluations": {
+        "cccStructure": true,
+        "sentenceQuality": false,
+        "topicContinuity": true,
+        "terminologyConsistency": true,
+        "structuralParallelism": true
+      },
+      "issues": [
+        {
+          "issue": "Some sentences exceed 40 words, increasing cognitive load.",
+          "severity": "major",
+          "recommendation": "Break long sentences into shorter ones to improve readability."
+        }
+      ]
+    }
+  ]
+}

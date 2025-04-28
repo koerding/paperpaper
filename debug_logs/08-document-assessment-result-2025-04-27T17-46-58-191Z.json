@@ -1,0 +1,52 @@
+{
+  "documentAssessment": {
+    "titleQuality": {
+      "score": 7,
+      "assessment": "The title captures the central theme of misleading causal statements in functional connectivity research.",
+      "recommendation": "Consider making the title more specific to the main finding or contribution of the paper."
+    },
+    "abstractCompleteness": {
+      "score": 6,
+      "assessment": "The abstract identifies the problem and suggests a solution but lacks a clear statement of broader significance.",
+      "recommendation": "Include a sentence on the broader impact of the findings to enhance the abstract's completeness."
+    },
+    "introductionStructure": {
+      "score": 8,
+      "assessment": "The introduction effectively sets up the context and identifies the research gap.",
+      "recommendation": "Ensure the introduction clearly states the importance of addressing the identified gap."
+    },
+    "resultsOrganization": {
+      "score": 5,
+      "assessment": "Results are presented with some logical flow but are occasionally interrupted by unrelated content.",
+      "recommendation": "Reorganize the results to maintain a clear logical progression supporting the central claim."
+    },
+    "discussionQuality": {
+      "score": 6,
+      "assessment": "The discussion addresses limitations and broader impacts but lacks a strong synthesis of results.",
+      "recommendation": "Strengthen the synthesis of results and their implications for the field."
+    },
+    "messageFocus": {
+      "score": 5,
+      "assessment": "The paper has multiple sections that diverge from the central message, affecting focus.",
+      "recommendation": "Consolidate sections to maintain a clear focus on the central contribution."
+    },
+    "topicOrganization": {
+      "score": 4,
+      "assessment": "Topics are scattered, with frequent shifts that disrupt the logical flow.",
+      "recommendation": "Group related ideas and minimize topic shifts to improve coherence."
+    }
+  },
+  "majorIssues": [
+    {
+      "issue": "Frequent topic shifts and scattered presentation of related ideas.",
+      "location": "Throughout the results and discussion sections.",
+      "severity": "major",
+      "recommendation": "Reorganize the paper to consolidate related topics and maintain a logical flow."
+    }
+  ],
+  "overallRecommendations": [
+    "Reorganize the results and discussion sections to improve logical flow and coherence.",
+    "Enhance the abstract by including the broader significance of the findings.",
+    "Ensure the title and introduction clearly reflect the central contribution and its importance."
+  ]
+}
