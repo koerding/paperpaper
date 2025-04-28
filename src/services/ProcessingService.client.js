@@ -10,7 +10,7 @@ const clientDebugLog = (prefix, content) => {
 };
 
 /**
- * Extract text from a PDF file
+ * Extract text from a PDF file using PDF.js from CDN
  * @param {ArrayBuffer} arrayBuffer - The PDF file as an array buffer
  * @param {Function} onProgress - Optional callback for progress updates (page, totalPages)
  * @returns {Promise<string>} - Extracted text content
@@ -18,14 +18,29 @@ const clientDebugLog = (prefix, content) => {
 export async function extractTextFromPDF(arrayBuffer, onProgress) {
   console.log('[ProcessingService.client] Extracting text from PDF...');
   try {
-    // Dynamically import PDF.js only when needed (client-side only)
-    // Using specific paths that work with Next.js
-    const pdfjsLib = await import('pdfjs-dist/build/pdf.js');
-    
-    // Set the worker source to a CDN
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.js`;
+    // Dynamically load PDF.js from CDN
+    if (typeof window.pdfjsLib === 'undefined') {
+      console.log('[ProcessingService.client] Loading PDF.js from CDN...');
+      
+      // Create script element for the main library
+      const scriptElement = document.createElement('script');
+      scriptElement.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      
+      // Wait for the script to load
+      await new Promise((resolve, reject) => {
+        scriptElement.onload = resolve;
+        scriptElement.onerror = reject;
+        document.head.appendChild(scriptElement);
+      });
+      
+      // Set worker source path after library is loaded
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      
+      console.log('[ProcessingService.client] PDF.js loaded from CDN successfully');
     }
+    
+    // Use the globally available pdfjsLib from the CDN
+    const { pdfjsLib } = window;
     
     // Load the PDF file
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
