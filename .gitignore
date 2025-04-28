@@ -36,3 +36,6 @@ next-env.d.ts
 # Temporary files
 /tmp/*
 !/tmp/.gitkeep
+
+# Debug files
+/debug_logs/*
