@@ -1,4 +1,4 @@
-// components/PDFExtractionProgress.jsx
+// src/components/PDFExtractionProgress.jsx
 'use client'
 
 import React from 'react';
