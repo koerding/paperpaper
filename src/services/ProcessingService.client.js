@@ -12,22 +12,31 @@ const clientDebugLog = (prefix, content) => {
 /**
  * Extract text from a PDF file
  * @param {ArrayBuffer} arrayBuffer - The PDF file as an array buffer
+ * @param {Function} onProgress - Optional callback for progress updates (page, totalPages)
  * @returns {Promise<string>} - Extracted text content
  */
-export async function extractTextFromPDF(arrayBuffer) {
+export async function extractTextFromPDF(arrayBuffer, onProgress) {
   console.log('[ProcessingService.client] Extracting text from PDF...');
   try {
     // Dynamically import PDF.js only when needed (client-side only)
-    const pdfjsLib = await import('pdfjs-dist/build/pdf');
-    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
+    // Using specific paths that work with Next.js
+    const pdfjsLib = await import('pdfjs-dist/build/pdf.js');
     
-    // Set the worker source
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+    // Set the worker source to a CDN
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.js`;
+    }
     
     // Load the PDF file
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
     const numPages = pdf.numPages;
     console.log(`[ProcessingService.client] PDF loaded with ${numPages} pages`);
+    
+    // Call progress callback with initial state
+    if (typeof onProgress === 'function') {
+      onProgress(0, numPages);
+    }
     
     // Extract text from each page
     let textContent = [];
@@ -37,6 +46,11 @@ export async function extractTextFromPDF(arrayBuffer) {
       const pageText = content.items.map(item => item.str).join(' ');
       textContent.push(pageText);
       
+      // Call progress callback with current page
+      if (typeof onProgress === 'function') {
+        onProgress(i, numPages);
+      }
+      
       if (i % 10 === 0 || i === numPages) {
         console.log(`[ProcessingService.client] Extracted text from page ${i}/${numPages}`);
       }
@@ -45,6 +59,12 @@ export async function extractTextFromPDF(arrayBuffer) {
     // Join all pages with double newlines between pages
     const fullText = textContent.join('\n\n');
     clientDebugLog('extracted-pdf-text', fullText);
+    
+    // Call progress callback with completion
+    if (typeof onProgress === 'function') {
+      onProgress(numPages, numPages, true);
+    }
+    
     return fullText;
   } catch (error) {
     console.error('[ProcessingService.client] Error extracting text from PDF:', error);
@@ -55,9 +75,11 @@ export async function extractTextFromPDF(arrayBuffer) {
 /**
  * Extract text from various file formats (client-side version)
  * @param {File} file - The uploaded file object
+ * @param {Object} options - Additional options
+ * @param {Function} options.onProgress - Optional callback for progress updates
  * @returns {Promise<string>} - Extracted text content
  */
-export async function extractTextFromFile(file) {
+export async function extractTextFromFile(file, options = {}) {
   console.log('[ProcessingService.client] Attempting to extract text from file:', file?.name, 'Type:', file?.type);
 
   if (!file || typeof file.arrayBuffer !== 'function') {
@@ -70,14 +92,14 @@ export async function extractTextFromFile(file) {
 
     if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || file.name?.endsWith('.docx')) {
       console.log('[ProcessingService.client] Extracting text from DOCX using mammoth...');
-      const options = { arrayBuffer: arrayBuffer };
-      const result = await mammoth.extractRawText(options);
+      const mammothOptions = { arrayBuffer: arrayBuffer };
+      const result = await mammoth.extractRawText(mammothOptions);
       console.log('[ProcessingService.client] DOCX text extracted successfully.');
       clientDebugLog('extracted-docx-text', result.value);
       return result.value;
     } else if (file.type === 'application/pdf' || file.name?.endsWith('.pdf')) {
-      // Handle PDF extraction
-      return await extractTextFromPDF(arrayBuffer);
+      // Handle PDF extraction with progress tracking
+      return await extractTextFromPDF(arrayBuffer, options.onProgress);
     } else if (file.type === 'text/plain' || file.name?.endsWith('.txt')) {
       console.log('[ProcessingService.client] Extracting text from TXT...');
       const text = new TextDecoder().decode(arrayBuffer);
