@@ -1,5 +1,5 @@
 // File Path: src/services/AIService.js
-// Complete file: Using a JSON template in the prompt for the AI to fill
+// Complete file: Using a better JSON template and improved prompting for full document extraction
 
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
@@ -68,10 +68,103 @@ const loadRules = () => {
   return { paragraphRules, documentRules };
 };
 
+// Basic document structure extraction
+const extractDocumentStructure = async (openai, model, rawText) => {
+  try {
+    const structurePrompt = `
+I need you to extract just the basic structure of this scientific document.
+Do not analyze anything, just identify:
+
+1. The document title
+2. All section headings exactly as they appear in the text
+3. For each section, count the approximate number of paragraphs it contains
+
+Return your answer as a valid JSON object formatted like this:
+{
+  "title": "The document title here",
+  "sections": [
+    {
+      "name": "First section name (e.g. Introduction, Abstract, etc.)",
+      "paragraphCount": number_of_paragraphs_in_this_section
+    },
+    {
+      "name": "Second section name",
+      "paragraphCount": number_of_paragraphs_in_this_section
+    }
+    // etc for all sections
+  ]
+}
+
+Here is the document text:
+\`\`\`
+${rawText.substring(0, 100000)}
+\`\`\`
+
+ONLY return the JSON object containing the document structure, nothing else.`;
+
+    const structureResponse = await openai.chat.completions.create({
+      model: model,
+      messages: [{ role: 'user', content: structurePrompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 2000
+    });
+
+    const structureResult = structureResponse.choices[0]?.message?.content;
+    if (!structureResult) { throw new Error("Structure extraction response is empty"); }
+
+    const structure = JSON.parse(structureResult);
+    console.log('[AIService] Document structure extracted:', 
+                `Title: "${structure.title}", ` +
+                `${structure.sections.length} sections, ` + 
+                `est. ${structure.sections.reduce((sum, s) => sum + s.paragraphCount, 0)} paragraphs`);
+    
+    return structure;
+  } catch (error) {
+    console.error('[AIService] Error extracting document structure:', error);
+    return null;
+  }
+};
+
+// Validate the completeness of the analysis result
+const validateResults = (analysisResult) => {
+  // Check if we have sections
+  if (!Array.isArray(analysisResult.sections) || analysisResult.sections.length === 0) {
+    console.error('[AIService] Critical error: AI response contains no sections.');
+    return false;
+  }
+  
+  // Check if paragraphs exist in each section
+  let totalParagraphs = 0;
+  let sectionsWithoutParagraphs = [];
+  
+  analysisResult.sections.forEach((section, idx) => {
+    if (!Array.isArray(section.paragraphs) || section.paragraphs.length === 0) {
+      sectionsWithoutParagraphs.push(section.name || `Section ${idx+1}`);
+    } else {
+      totalParagraphs += section.paragraphs.length;
+    }
+  });
+  
+  if (sectionsWithoutParagraphs.length > 0) {
+    console.error(`[AIService] Error: Sections without paragraphs: ${sectionsWithoutParagraphs.join(', ')}`);
+    return false;
+  }
+  
+  // Check if we have a reasonable number of paragraphs
+  // Most scientific papers have at least 10-15 paragraphs
+  if (totalParagraphs < 5) {
+    console.error(`[AIService] Error: AI only extracted ${totalParagraphs} paragraphs, which seems too few.`);
+    return false;
+  }
+  
+  console.log(`[AIService] Validation passed: Found ${analysisResult.sections.length} sections with ${totalParagraphs} total paragraphs.`);
+  return true;
+};
 
 // --- Main Analysis Function ---
 export async function analyzeDocumentStructure(document /* unused */, rawText) {
-  console.log('[AIService] Starting single-call analysis (fill-template prompt v6)...'); // Updated log
+  console.log('[AIService] Starting single-call analysis (fill-template prompt v7)...'); // Updated log
   const serviceStartTime = Date.now();
 
   try {
@@ -113,7 +206,11 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
         console.warn(`[AIService] Input text truncated from ${rawText.length} to ${MAX_CHARS} characters.`);
     }
 
-    // --- Define the MORE DETAILED FULL JSON Template ---
+    // --- Extract document structure first ---
+    console.log('[AIService] Extracting document structure first...');
+    const documentStructure = await extractDocumentStructure(openai, model, truncatedText);
+
+    // --- Define the IMPROVED JSON Template ---
     const jsonTemplate = JSON.stringify({
         title: "...", // To be filled by AI
         abstract: {
@@ -126,7 +223,7 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
                 terminologyConsistency: null,
                 structuralParallelism: null
             },
-            issues: [ /* { issue: "MnK#: ...", severity: "...", recommendation: "MnK#: ..." } */ ] // AI fills array if any eval is false
+            issues: [] // AI fills array if any eval is false
         },
         documentAssessment: { // AI must fill ALL these objects
             titleQuality: { score: null, assessment: "...", recommendation: "..." },
@@ -137,63 +234,62 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
             messageFocus: { score: null, assessment: "...", recommendation: "..." },
             topicOrganization: { score: null, assessment: "...", recommendation: "..." }
         },
-        majorIssues: [ /* { issue: "MnK#: ...", location: "...", severity: "...", recommendation: "MnK#: ..." } */ ], // AI fills array
-        overallRecommendations: [ /* "MnK#: ..." */ ], // AI fills array
-        // **** Explicitly show multiple sections/paragraphs in template ****
+        majorIssues: [], // AI fills array
+        overallRecommendations: [], // AI fills array
+        
+        // The sections array MUST contain ALL sections found in the document
+        // DO NOT limit to just these example sections
         sections: [
+          // EXAMPLE SECTION 1 - THIS IS JUST AN EXAMPLE STRUCTURE
           {
-            name: "Section Name 1 (e.g., Introduction) - AI Replaces This",
+            name: "EXAMPLE: Introduction", // AI REPLACES with actual section name
             paragraphs: [
+              // EXAMPLE PARAGRAPH 1 - THIS IS JUST AN EXAMPLE FORMAT
               {
-                text: "Paragraph 1 text... AI Replaces This",
-                summary: "...", // AI generates summary
-                // AI fills these booleans based on Paragraph Rules
-                evaluations: { cccStructure: null, sentenceQuality: null, topicContinuity: null, terminologyConsistency: null, structuralParallelism: null },
-                 // AI fills array based on Paragraph Rules
-                issues: [ /* { issue: "MnK#:...", severity: "...", recommendation: "MnK#:..." } */ ]
+                text: "EXAMPLE TEXT - AI MUST REPLACE WITH ACTUAL PARAGRAPH TEXT",
+                summary: "EXAMPLE SUMMARY - AI MUST REPLACE",
+                evaluations: { 
+                  cccStructure: null, 
+                  sentenceQuality: null, 
+                  topicContinuity: null, 
+                  terminologyConsistency: null, 
+                  structuralParallelism: null 
+                },
+                issues: []
               },
-              {
-                 text: "Paragraph 2 text... AI Replaces This",
-                 summary: "...",
-                 evaluations: { cccStructure: null, sentenceQuality: null, topicContinuity: null, terminologyConsistency: null, structuralParallelism: null },
-                 issues: []
-              }
-              // AI: Add more paragraph objects here for Section 1 based on PAPER TEXT
+              // REPEAT FOR EACH PARAGRAPH - AI MUST ADD ALL PARAGRAPHS FROM THE DOCUMENT
+              // DO NOT LIMIT TO JUST THESE EXAMPLES
             ]
           },
-          {
-             name: "Section Name 2 (e.g., Methods) - AI Replaces This",
-             // **** CORRECTED THIS LINE ****
-             "paragraphs": [
-             // ***************************
-                {
-                   text: "Paragraph 1 text... AI Replaces This",
-                   summary: "...",
-                   evaluations: { cccStructure: null, sentenceQuality: null, topicContinuity: null, terminologyConsistency: null, structuralParallelism: null },
-                   issues: []
-                }
-                 // AI: Add more paragraph objects here for Section 2 based on PAPER TEXT
-             ]
-          }
-          // AI: Add more section objects here as identified in the PAPER TEXT
+          // REPEAT FOR EACH SECTION - AI MUST ADD ALL SECTIONS FROM THE DOCUMENT
+          // DO NOT LIMIT TO JUST THESE EXAMPLES
         ]
-        // ******************************************************************
-    }, null, 2); // Pretty print for the prompt
+    }, null, 2);
 
-
-    // --- ***** Prompt using MORE DETAILED JSON Template ***** ---
-    const fullPrompt = `
+    // --- Construct Improved Prompt ---
+    let fullPrompt = `
 You are an expert scientific writing analyzer based on the Mensh & Kording (MnK) 10 Simple Rules paper. Your primary goal is to meticulously analyze the provided paper text and return a COMPLETE and VALID JSON object based EXACTLY on the template provided.
 
 **TASK:**
-1.  Read the **PAPER TEXT**.
-2.  Analyze the text based on the **EVALUATION RULES**.
-3.  **Fill in** the provided **JSON TEMPLATE** with your analysis results. Replace ALL placeholders like "..." and null values. **CRITICAL:** Ensure every single field specified in the template is present and filled. **Identify ALL relevant sections and paragraphs from the PAPER TEXT and represent them accurately within the 'sections' array in the template structure.**
-4.  **Paragraph Evaluation Details:** For EACH paragraph identified in the text (including the abstract):
-    * Fill the "evaluations" object using ONLY these EXACT boolean keys: **"cccStructure", "sentenceQuality", "topicContinuity", "terminologyConsistency", "structuralParallelism"**.
-    * Fill the "issues" array: **IF any evaluation flag is \`false\`, MUST add a corresponding issue object**. Prepend rule-specific feedback with "MnK{ruleNumber}: ". If all flags \`true\`, use \`[]\`.
-5.  **Document Assessment Details:** MUST provide scores (1-10), assessments, recommendations for ALL keys: "titleQuality", "abstractCompleteness", "introductionStructure", "resultsOrganization", "discussionQuality", "messageFocus", "topicOrganization". Prepend rule-specific feedback with "MnK{ruleNumber}: ".
-6.  **Major Issues & Recommendations:** Populate these arrays, prepending rule-specific feedback with "MnK{ruleNumber}: ".
+1. Read the **PAPER TEXT** carefully and completely.
+2. Analyze the text based on the **EVALUATION RULES**.
+3. **Fill in** the provided **JSON TEMPLATE** with your analysis results. Replace ALL placeholders and null values.
+
+**CRITICAL INSTRUCTION - READ CAREFULLY:**
+- You MUST identify and include EVERY SINGLE SECTION and EVERY SINGLE PARAGRAPH from the paper.
+- The template shows example formats for sections and paragraphs, but you MUST NOT limit yourself to just those examples.
+- Your final JSON MUST include ALL sections and ALL paragraphs from the document, with proper analysis for each.
+- Section names should match what's in the document (e.g., "Introduction", "Methods", "Results", "Discussion", etc.)
+- If a section has 10 paragraphs, you must include all 10 paragraphs in that section.
+- If the document has 8 sections, you must include all 8 sections in your response.
+
+**Paragraph Evaluation Details:** For EACH paragraph identified in the text (including the abstract):
+* Fill the "evaluations" object using ONLY these EXACT boolean keys: **"cccStructure", "sentenceQuality", "topicContinuity", "terminologyConsistency", "structuralParallelism"**.
+* Fill the "issues" array: **IF any evaluation flag is \`false\`, MUST add a corresponding issue object**. Prepend rule-specific feedback with "MnK{ruleNumber}: ". If all flags \`true\`, use \`[]\`.
+
+**Document Assessment Details:** MUST provide scores (1-10), assessments, recommendations for ALL keys: "titleQuality", "abstractCompleteness", "introductionStructure", "resultsOrganization", "discussionQuality", "messageFocus", "topicOrganization". Prepend rule-specific feedback with "MnK{ruleNumber}: ".
+
+**Major Issues & Recommendations:** Populate these arrays, prepending rule-specific feedback with "MnK{ruleNumber}: ".
 
 **PAPER TEXT:**
 \`\`\`
@@ -205,6 +301,20 @@ ${truncatedText}
 ${paragraphRulesPrompt}
 --- Document Rules ---
 ${documentRulesPrompt}
+`;
+
+    // Add document structure to the prompt if available
+    if (documentStructure && documentStructure.sections && documentStructure.sections.length > 0) {
+      fullPrompt += `
+**DOCUMENT STRUCTURE DETECTED:**
+Title: "${documentStructure.title}"
+Sections (${documentStructure.sections.length}):
+${documentStructure.sections.map(s => `- ${s.name}: ~${s.paragraphCount} paragraphs`).join('\n')}
+
+Your response MUST include all ${documentStructure.sections.length} sections listed above and analyze all paragraphs in each section (approximately ${documentStructure.sections.reduce((sum, s) => sum + s.paragraphCount, 0)} total paragraphs).`;
+    }
+
+    fullPrompt += `
 
 **JSON TEMPLATE TO FILL (Fill ALL fields and replicate section/paragraph structure):**
 \`\`\`json
@@ -213,26 +323,22 @@ ${jsonTemplate}
 
 **FINAL INSTRUCTIONS:**
 - Return ONLY the completed, valid JSON object based on the template.
-- **Accurately represent ALL identified sections and paragraphs from the paper text within the 'sections' array, following the nested structure shown in the template.**
-- **It is MANDATORY to include and fill ALL fields shown in the template, especially ALL keys within 'documentAssessment' and the correct keys within 'evaluations' for all paragraphs.**
+- Do NOT skip any sections or paragraphs found in the paper.
+- Do NOT limit yourself to the number of example sections/paragraphs shown in the template.
+- Include EVERY section and EVERY paragraph with all required evaluations.
 - Use boolean \`true\`/\`false\` for paragraph evaluations.
 - Generate an 'issue' item whenever a paragraph evaluation is \`false\`.
 - Strictly follow the MnK$ tagging requirement.
 `;
-    // --- ***** REVISED PROMPT END ***** ---
 
     // **** Log the full prompt ****
-    // WARNING: This can be very long in the console! Consider removing after debugging.
     console.log("\n--- OpenAI Prompt Start (Length:", fullPrompt.length, ") ---\n", fullPrompt, "\n--- OpenAI Prompt End ---\n");
-
 
     // --- Make the Single API Call ---
     const requestedMaxTokens = 16384; // Using higher possible output limit
     safeLog('openai-request', `Sending analysis request with max_tokens=${requestedMaxTokens}...`);
     const response = await openai.chat.completions.create({
-        // **** Restored 'model' parameter ****
         model: model,
-        // ************************************
         messages: [{ role: 'user', content: fullPrompt }],
         response_format: { type: "json_object" }, // Ensure model supports this
         temperature: 0.1, // Low temperature for better structure adherence
@@ -248,7 +354,6 @@ ${jsonTemplate}
     if (!analysisResultRaw) { throw new Error("OpenAI response content is empty."); }
 
     // **** Log the full raw response ****
-    // WARNING: This can also be very long! Consider removing after debugging.
     console.log("\n--- OpenAI Raw Response Start (Length:", analysisResultRaw.length, ") ---\n", analysisResultRaw, "\n--- OpenAI Raw Response End ---\n");
 
     // --- Parse and Process Results ---
@@ -260,6 +365,68 @@ ${jsonTemplate}
         console.error("[AIService] Failed to parse OpenAI JSON response:", parseError);
         console.error("--- OpenAI Raw Response on Parse Error ---\n", analysisResultRaw, "\n--- End Raw Response ---");
         throw new Error(`Failed to parse analysis results from AI.`);
+    }
+
+    // --- Validate and potentially retry ---
+    if (!validateResults(analysisResult)) {
+      console.warn('[AIService] Initial AI analysis failed validation, attempting retry with stronger instructions...');
+      
+      // Construct a retry prompt with even stronger emphasis
+      const retryPrompt = `
+IMPORTANT: Your previous analysis did not correctly extract all sections and paragraphs from the document.
+
+You MUST include EVERY section and EVERY paragraph from the document in your analysis. The document clearly has more content than what you included.
+
+Specifically:
+1. Identify EACH distinct section in the document (Introduction, Methods, Results, Discussion, etc.)
+2. For EACH section, extract and analyze EVERY paragraph within that section
+3. Do not skip or summarize multiple paragraphs as one
+4. Follow the exact template structure, but include ALL content from the document
+${documentStructure ? `
+According to my analysis, the document has:
+- ${documentStructure.sections.length} sections
+- Approximately ${documentStructure.sections.reduce((sum, s) => sum + s.paragraphCount, 0)} paragraphs
+Your response must reflect this structure completely.` : ''}
+
+Here's the paper text again:
+\`\`\`
+${truncatedText}
+\`\`\`
+
+Return a complete, valid JSON with ALL sections and paragraphs following the template structure.
+`;
+
+      try {
+        // Make a retry call with enhanced instructions
+        const retryResponse = await openai.chat.completions.create({
+          model: model,
+          messages: [
+            { role: 'user', content: fullPrompt },
+            { role: 'assistant', content: analysisResultRaw }, // Include the previous (incomplete) response
+            { role: 'user', content: retryPrompt }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.1,
+          max_tokens: requestedMaxTokens
+        });
+        
+        const retryResultRaw = retryResponse.choices[0]?.message?.content;
+        if (!retryResultRaw) { throw new Error("Retry OpenAI response content is empty."); }
+        
+        try {
+          const retryResult = JSON.parse(retryResultRaw);
+          if (validateResults(retryResult)) {
+            console.log('[AIService] Retry succeeded! Using improved analysis results.');
+            analysisResult = retryResult; // Replace with better result
+          } else {
+            console.warn('[AIService] Retry still failed validation. Using original results but they may be incomplete.');
+          }
+        } catch (parseError) {
+          console.error("[AIService] Failed to parse retry JSON response:", parseError);
+        }
+      } catch (retryError) {
+        console.error('[AIService] Error during retry attempt:', retryError);
+      }
     }
 
     // --- Calculate Statistics ---
@@ -299,7 +466,6 @@ ${jsonTemplate}
        criticalCount = -1; majorCount = -1; minorCount = -1; // Indicate error
     }
 
-
     // --- Construct Final Output ---
     // Assume AI filled the template; provide defaults mainly if top-level keys are entirely missing
     const finalResults = {
@@ -311,6 +477,15 @@ ${jsonTemplate}
       statistics: { critical: criticalCount, major: majorCount, minor: minorCount },
       sections: analysisResult.sections ?? [],
     };
+
+    // Log section and paragraph count statistics
+    const sectionCount = finalResults.sections?.length || 0;
+    let paragraphCount = 0;
+    finalResults.sections?.forEach(section => {
+      paragraphCount += section.paragraphs?.length || 0;
+    });
+
+    console.log(`[AIService] Final results: ${sectionCount} sections, ${paragraphCount} paragraphs, ${criticalCount} critical issues, ${majorCount} major issues, ${minorCount} minor issues`);
 
     // Basic validation logging
     if (typeof finalResults.documentAssessment === 'object' && Object.keys(finalResults.documentAssessment).length > 0) {
@@ -327,12 +502,12 @@ ${jsonTemplate}
      }
     if (!Array.isArray(finalResults.sections)) { console.warn("Final results sections is not an array"); }
 
-
     safeLog('final-results-structure-check', {
         titleExists: !!finalResults.title,
         abstractExists: !!finalResults.abstract,
         docAssessmentKeysCount: finalResults.documentAssessment ? Object.keys(finalResults.documentAssessment).length : 0,
         sectionsCount: finalResults.sections.length,
+        paragraphCount: paragraphCount,
         stats: finalResults.statistics
      });
     console.log(`[AIService] Single-call analysis completed in ${Date.now() - serviceStartTime}ms`);
