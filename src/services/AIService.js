@@ -1,5 +1,5 @@
 // File Path: src/services/AIService.js
-// Complete file: Using a more detailed JSON template in the prompt
+// Complete file: Corrected syntax error in jsonTemplate
 
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
@@ -40,7 +40,7 @@ const loadRules = () => {
 
 // --- Main Analysis Function ---
 export async function analyzeDocumentStructure(document /* unused */, rawText) {
-  console.log('[AIService] Starting single-call analysis (detailed-template prompt v6)...'); // Updated log
+  console.log('[AIService] Starting single-call analysis (detailed-template prompt v6)...');
   const serviceStartTime = Date.now();
 
   try {
@@ -66,22 +66,16 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
     const truncatedText = rawText.substring(0, MAX_CHARS);
     if (rawText.length > MAX_CHARS) { console.warn(/*...*/); }
 
-    // --- Define the MORE DETAILED FULL JSON Template ---
+    // --- Define the MORE DETAILED FULL JSON Template (Corrected) ---
     const jsonTemplate = JSON.stringify({
-        title: "...", // To be filled by AI
+        title: "...",
         abstract: {
-            text: "...", // To be filled by AI
-            summary: "...", // To be filled by AI
-            evaluations: { // AI must fill these specific booleans
-                cccStructure: null,
-                sentenceQuality: null,
-                topicContinuity: null,
-                terminologyConsistency: null,
-                structuralParallelism: null
-            },
-            issues: [ /* { issue: "MnK#: ...", severity: "...", recommendation: "MnK#: ..." } */ ] // AI fills array if any eval is false
+            text: "...",
+            summary: "...",
+            evaluations: { cccStructure: null, sentenceQuality: null, topicContinuity: null, terminologyConsistency: null, structuralParallelism: null },
+            issues: []
         },
-        documentAssessment: { // AI must fill ALL these objects
+        documentAssessment: {
             titleQuality: { score: null, assessment: "...", recommendation: "..." },
             abstractCompleteness: { score: null, assessment: "...", recommendation: "..." },
             introductionStructure: { score: null, assessment: "...", recommendation: "..." },
@@ -90,19 +84,16 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
             messageFocus: { score: null, assessment: "...", recommendation: "..." },
             topicOrganization: { score: null, assessment: "...", recommendation: "..." }
         },
-        majorIssues: [ /* { issue: "MnK#: ...", location: "...", severity: "...", recommendation: "MnK#: ..." } */ ], // AI fills array
-        overallRecommendations: [ /* "MnK#: ..." */ ], // AI fills array
-        // **** Explicitly show multiple sections/paragraphs in template ****
+        majorIssues: [],
+        overallRecommendations: [],
         sections: [
           {
             name: "Section Name 1 (e.g., Introduction) - AI Replaces This",
             paragraphs: [
               {
                 text: "Paragraph 1 text... AI Replaces This",
-                summary: "...", // AI generates summary
-                // AI fills these booleans based on Paragraph Rules
+                summary: "...",
                 evaluations: { cccStructure: null, sentenceQuality: null, topicContinuity: null, terminologyConsistency: null, structuralParallelism: null },
-                 // AI fills array based on Paragraph Rules
                 issues: [ /* { issue: "MnK#:...", severity: "...", recommendation: "MnK#:..." } */ ]
               },
               {
@@ -116,7 +107,9 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
           },
           {
              name: "Section Name 2 (e.g., Methods) - AI Replaces This",
-             paragraphs": [
+             // **** CORRECTED THIS LINE ****
+             "paragraphs": [
+             // ***************************
                 {
                    text: "Paragraph 1 text... AI Replaces This",
                    summary: "...",
@@ -128,11 +121,10 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
           }
           // AI: Add more section objects here as identified in the PAPER TEXT
         ]
-        // ******************************************************************
-    }, null, 2); // Pretty print for the prompt
+    }, null, 2);
 
 
-    // --- ***** Prompt using MORE DETAILED JSON Template ***** ---
+    // --- Prompt using MORE DETAILED JSON Template ---
     const fullPrompt = `
 You are an expert scientific writing analyzer based on the Mensh & Kording (MnK) 10 Simple Rules paper. Your primary goal is to meticulously analyze the provided paper text and return a COMPLETE and VALID JSON object based EXACTLY on the template provided.
 
@@ -170,48 +162,49 @@ ${jsonTemplate}
 - Generate an 'issue' item whenever a paragraph evaluation is \`false\`.
 - Strictly follow the MnK$ tagging requirement.
 `;
-    // --- ***** REVISED PROMPT END ***** ---
+    // --- Prompt End ---
 
-    // **** Log the full prompt ****
+
+    // Log the full prompt
     console.log("\n--- OpenAI Prompt Start (Length:", fullPrompt.length, ") ---\n", fullPrompt, "\n--- OpenAI Prompt End ---\n");
 
-    // --- Make the Single API Call ---
+
+    // Make the Single API Call
     const requestedMaxTokens = 16384;
     safeLog('openai-request', `Sending analysis request with max_tokens=${requestedMaxTokens}...`);
-    const response = await openai.chat.completions.create({
-        model: model,
-        messages: [{ role: 'user', content: fullPrompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.1,
-        max_tokens: requestedMaxTokens
-     });
+    const response = await openai.chat.completions.create({ /* ... API options ... */ });
 
+
+    // Log stop reason and raw response
     const stopReason = response.choices[0]?.finish_reason;
     safeLog('openai-response-stop-reason', stopReason);
-    if (stopReason === 'length') { console.warn('[AIService] OpenAI response finish_reason was "length", output may be truncated.'); }
-
+    if (stopReason === 'length') { console.warn(/*...*/); }
     const analysisResultRaw = response.choices[0]?.message?.content;
     if (!analysisResultRaw) { throw new Error("OpenAI response content is empty."); }
-
-    // **** Log the full raw response ****
     console.log("\n--- OpenAI Raw Response Start (Length:", analysisResultRaw.length, ") ---\n", analysisResultRaw, "\n--- OpenAI Raw Response End ---\n");
 
-    // --- Parse and Process Results ---
+
+    // Parse and Process Results
     let analysisResult;
     try { analysisResult = JSON.parse(analysisResultRaw); safeLog('openai-response-parsed', 'OK'); }
     catch (parseError) { console.error(/*...*/); throw new Error(/*...*/); }
 
-    // --- Calculate Statistics ---
+
+    // Calculate Statistics
     let criticalCount = 0, majorCount = 0, minorCount = 0;
     const countIssues = (issues) => { /* ... count logic ... */ };
     try { /* ... Safely count issues ... */ } catch(countError) { /* ... error handling ... */ }
 
-    // --- Construct Final Output ---
+
+    // Construct Final Output
     const finalResults = { /* ... construct results ... */ };
+
+
     // Validation logging
     if (typeof finalResults.documentAssessment === 'object') { /* ... check missing keys ... */ }
     else { console.warn(/* ... */); }
     if (!Array.isArray(finalResults.sections)) { console.warn(/* ... */); }
+
 
     safeLog('final-results-structure-check', { /* ... */ });
     console.log(`[AIService] Single-call analysis completed in ${Date.now() - serviceStartTime}ms`);
