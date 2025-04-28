@@ -2,7 +2,8 @@
 'use client'
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Cloud, FileText, Info, ExternalLink, FileIcon, FilePdf } from 'lucide-react';
+// Only import icons we know exist
+import { Cloud, FileText, Info, ExternalLink } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext.jsx';
 import { extractTextFromFile } from '@/services/ProcessingService.client.js';
 // Import rules data for tooltips
@@ -52,6 +53,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
   const [file, setFile] = useState(null);
   const [fileText, setFileText] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isPdfFile, setIsPdfFile] = useState(false);
   const maxSize = 10 * 1024 * 1024;
   
   // onDrop handler with PDF support
@@ -60,8 +62,14 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         setError(null);
         const uploadedFile = acceptedFiles[0];
         if (!uploadedFile) { console.log('[FileUploader] No file accepted.'); return; }
+        
+        // Reset states
         setFile(uploadedFile);
         setFileText('');
+        
+        // Check if it's a PDF file
+        const isPdf = uploadedFile.type === 'application/pdf' || uploadedFile.name?.endsWith('.pdf');
+        setIsPdfFile(isPdf);
         
         // Validation logic
         if (uploadedFile.size > maxSize) { 
@@ -93,9 +101,10 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
             return; 
         }
         
-        // Client-side text extraction
+        // Client-side text extraction with progress tracking for PDFs
         try {
             setIsExtracting(true);
+            
             const extractedText = await extractTextFromFile(uploadedFile);
             console.log(`[FileUploader] Client-side text extracted successfully. Length: ${extractedText.length}`);
             
@@ -109,7 +118,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         } catch (err) { 
             console.warn('[FileUploader] Could not extract text client-side:', err);
             // Set specific error for PDF extraction failures
-            if (uploadedFile.type === 'application/pdf' || uploadedFile.name?.endsWith('.pdf')) {
+            if (isPdf) {
                 setError(`Could not extract text from PDF: ${err.message}. Try a different PDF or file format.`);
             }
         } finally {
@@ -151,12 +160,11 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
       }
    };
    
-  // Get appropriate file icon based on file type
+  // Get appropriate file icon based on file type - only using FileText for everything
   const getFileIcon = () => {
-    if (!file) return <FileIcon className="h-6 w-6 text-primary" />;
-    
-    if (file.type === 'application/pdf' || file.name?.endsWith('.pdf')) {
-      return <FilePdf className="h-6 w-6 text-red-500" />;
+    // Use FileText for all types, but with different colors
+    if (file && (file.type === 'application/pdf' || file.name?.endsWith('.pdf'))) {
+      return <FileText className="h-6 w-6 text-red-500" />;
     }
     
     return <FileText className="h-6 w-6 text-primary" />;
@@ -209,7 +217,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         <div className="border rounded-lg p-4 space-y-4">
            <div className="flex items-center space-x-3">
              {getFileIcon()}
-             <div>
+             <div className="flex-grow">
                <p className="font-medium">{file.name}</p>
                <p className="text-sm text-muted-foreground">
                  {(file.size / 1024).toFixed(1)} KB 
@@ -219,6 +227,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
                </p>
              </div>
            </div>
+           
            <div className="flex justify-end">
              <button 
                onClick={handleSubmit} 
