@@ -267,7 +267,8 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
     }, null, 2);
 
     // --- Construct Improved Prompt ---
-  // --- Construct Improved Prompt with more critical evaluation standards ---
+
+// --- Construct Improved Prompt with mandatory detailed explanations ---
 let fullPrompt = `
 You are an expert scientific writing analyzer based on the Mensh & Kording (MnK) 10 Simple Rules paper. Your primary goal is to meticulously analyze the provided paper text and return a COMPLETE and VALID JSON object based EXACTLY on the template provided.
 
@@ -288,16 +289,16 @@ You are an expert scientific writing analyzer based on the Mensh & Kording (MnK)
 When evaluating paragraphs, apply extremely high standards. Paragraphs in scientific writing rarely meet perfect standards. Your default assumption should be that most scientific writing has room for improvement. Use the following strict evaluation criteria:
 
 1. "cccStructure" (Context-Content-Conclusion) - Mark as false unless the paragraph clearly has:
-   - A distinct context/topic sentence at the beginning of the paragraph that introduces the paragraph's main point/ question answere
+   - A distinct context/topic sentence that introduces the paragraph's main point
    - Well-developed content that supports the topic
    - A clear concluding or transition sentence
-   - The conclusion sentence in a way is an answer to the context sentence, and the contents builds from the context towards the conclusion
-   - If any of these three components is missing, mark as false
+   - If any of these three components is missing, mark as false.
 
 2. "sentenceQuality" - Mark as false if you find ANY of these issues:
-   - Sentences are over 30 words long
-   - Passive voice used frequently without good reasons for this
+   - Sentences over 30 words long
+   - Passive voice used frequently
    - Vague language or excessive jargon
+   - Redundant phrasing
    - Missing or unnecessary punctuation
    - Run-on sentences or sentence fragments
 
@@ -321,10 +322,22 @@ When evaluating paragraphs, apply extremely high standards. Paragraphs in scient
 
 When in doubt, mark the evaluation as FALSE and provide specific feedback. The goal is to identify areas for improvement, not to praise mediocre writing.
 
+**MANDATORY ISSUE EXPLANATIONS:**
+- For EVERY criterion marked as 'false', you MUST include a detailed explanation in the "issues" array
+- Each issue explanation MUST:
+  1. Reference the specific MnK rule number
+  2. Include a 'severity' rating (critical, major, or minor)
+  3. Provide a specific, detailed explanation that references the actual text/problem in the paragraph
+  4. Offer a clear recommendation for improvement
+- Never mark a criterion as 'false' without adding a corresponding issue explanation
+- If multiple criteria are 'false' for a paragraph, include a separate issue entry for EACH failed criterion
+- The explanation should be detailed enough that the author can understand exactly what needs to be fixed
+
 **Paragraph Evaluation Details:** For EACH paragraph identified in the text (including the abstract):
 * Fill the "evaluations" object using ONLY these EXACT boolean keys: **"cccStructure", "sentenceQuality", "topicContinuity", "terminologyConsistency", "structuralParallelism"**.
 * Fill the "issues" array: **IF any evaluation flag is \`false\`, MUST add a corresponding issue object**. Prepend rule-specific feedback with "MnK{ruleNumber}: ". If all flags \`true\`, use \`[]\`.
 * Be STRICT in your evaluation. High-quality scientific writing is rare - if you're marking most paragraphs as perfect, you're not being critical enough.
+* Every issue MUST be explained in enough detail that the author can understand exactly what's wrong and how to fix it.
 
 **Document Assessment Details:** MUST provide scores (1-10), assessments, recommendations for ALL keys: "titleQuality", "abstractCompleteness", "introductionStructure", "resultsOrganization", "discussionQuality", "messageFocus", "topicOrganization". Prepend rule-specific feedback with "MnK{ruleNumber}: ".
 
@@ -341,6 +354,7 @@ ${paragraphRulesPrompt}
 --- Document Rules ---
 ${documentRulesPrompt}
 `;
+    
 
     // Add document structure to the prompt if available
     if (documentStructure && documentStructure.sections && documentStructure.sections.length > 0) {
