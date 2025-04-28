@@ -1,22 +1,15 @@
 // File Path: src/components/FileUploader.jsx
-// Fixed > syntax error in intro text AGAIN
 'use client'
-
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Cloud, FileText, Info, ExternalLink } from 'lucide-react';
+import { Cloud, FileText, Info, ExternalLink, FileIcon, FilePdf } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext.jsx';
 import { extractTextFromFile } from '@/services/ProcessingService.client.js';
-
 // Import rules data for tooltips
 import allRulesData from '@/rules.json'; // Adjust path if needed
-
 // Import Tippy for tooltips
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css'; // Default Tippy CSS
-// Optional: import theme CSS if using theme prop
-// import 'tippy.js/themes/light-border.css';
-
 
 // --- Build Rule Title Map Dynamically ---
 const buildRuleMap = () => {
@@ -34,7 +27,6 @@ const buildRuleMap = () => {
     return map;
 };
 const ruleTitleMap = buildRuleMap(); // Build map once
-
 const getRuleTitle = (ruleNum) => {
     const key = String(ruleNum);
     const title = ruleTitleMap.get(key);
@@ -54,15 +46,15 @@ const MnkTag = ({ ruleNum }) => {
     );
 };
 
-
 // --- FileUploader Component ---
 export default function FileUploader({ onFileSubmit, isProcessing }) {
   const { setError } = useAppContext();
   const [file, setFile] = useState(null);
   const [fileText, setFileText] = useState('');
+  const [isExtracting, setIsExtracting] = useState(false);
   const maxSize = 10 * 1024 * 1024;
-
-  // onDrop, useDropzone, handleSubmit logic remains the same
+  
+  // onDrop handler with PDF support
   const onDrop = useCallback(async (acceptedFiles) => {
         console.log('[FileUploader] onDrop triggered.');
         setError(null);
@@ -70,37 +62,111 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         if (!uploadedFile) { console.log('[FileUploader] No file accepted.'); return; }
         setFile(uploadedFile);
         setFileText('');
+        
         // Validation logic
-        if (uploadedFile.size > maxSize) { setError('File is too large. Maximum size is 10MB.'); setFile(null); return; }
-        const validTypes = [ 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain', 'text/markdown', 'text/x-tex', 'application/x-tex' ];
-        if (!validTypes.includes(uploadedFile.type) && !uploadedFile.name?.endsWith('.tex')) { setError('Unsupported file type. Please upload .docx, .txt, .md, or .tex files.'); setFile(null); return; }
+        if (uploadedFile.size > maxSize) { 
+            setError('File is too large. Maximum size is 10MB.'); 
+            setFile(null); 
+            return; 
+        }
+        
+        // Updated valid types list with PDF
+        const validTypes = [
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+            'application/pdf',
+            'text/plain', 
+            'text/markdown', 
+            'text/x-tex', 
+            'application/x-tex' 
+        ];
+        
+        const isValidByMime = validTypes.includes(uploadedFile.type);
+        const isValidByExt = uploadedFile.name?.endsWith('.tex') || 
+                            uploadedFile.name?.endsWith('.pdf') ||
+                            uploadedFile.name?.endsWith('.docx') ||
+                            uploadedFile.name?.endsWith('.txt') ||
+                            uploadedFile.name?.endsWith('.md');
+                            
+        if (!isValidByMime && !isValidByExt) { 
+            setError('Unsupported file type. Please upload .pdf, .docx, .txt, .md, or .tex files.'); 
+            setFile(null); 
+            return; 
+        }
+        
         // Client-side text extraction
         try {
+            setIsExtracting(true);
             const extractedText = await extractTextFromFile(uploadedFile);
             console.log(`[FileUploader] Client-side text extracted successfully. Length: ${extractedText.length}`);
-            if (extractedText.length > 100000) { setError('Document is too long (client-side check). Maximum 100,000 characters allowed.'); setFile(null); return; }
+            
+            if (extractedText.length > 100000) { 
+                setError('Document is too long (client-side check). Maximum 100,000 characters allowed.'); 
+                setFile(null); 
+                return; 
+            }
+            
             setFileText(extractedText);
-        } catch (err) { console.warn('[FileUploader] Could not extract text client-side:', err); }
+        } catch (err) { 
+            console.warn('[FileUploader] Could not extract text client-side:', err);
+            // Set specific error for PDF extraction failures
+            if (uploadedFile.type === 'application/pdf' || uploadedFile.name?.endsWith('.pdf')) {
+                setError(`Could not extract text from PDF: ${err.message}. Try a different PDF or file format.`);
+            }
+        } finally {
+            setIsExtracting(false);
+        }
    }, [setError, maxSize]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, multiple: false, maxSize });
-
+   
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
+    onDrop, 
+    multiple: false, 
+    maxSize,
+    accept: {
+      'application/pdf': ['.pdf'],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      'text/plain': ['.txt'],
+      'text/markdown': ['.md'],
+      'text/x-tex': ['.tex'],
+      'application/x-tex': ['.tex']
+    }
+  });
+  
   const handleSubmit = async () => {
       if (!file) { setError('Please select a file first.'); return; }
       console.log('[FileUploader] handleSubmit called for file:', file.name);
-      if (typeof onFileSubmit !== 'function') { setError('Internal configuration error: Cannot submit file.'); console.error('[FileUploader] onFileSubmit is not a function!'); return; }
-      try { await onFileSubmit(file, fileText); console.log('[FileUploader] Successfully called onFileSubmit prop.'); }
-      catch (err) { console.error('[FileUploader] Error calling onFileSubmit prop:', err); }
-      finally { console.log('[FileUploader] handleSubmit finished.'); }
+      if (typeof onFileSubmit !== 'function') { 
+          setError('Internal configuration error: Cannot submit file.'); 
+          console.error('[FileUploader] onFileSubmit is not a function!'); 
+          return; 
+      }
+      try { 
+          await onFileSubmit(file, fileText); 
+          console.log('[FileUploader] Successfully called onFileSubmit prop.'); 
+      }
+      catch (err) { 
+          console.error('[FileUploader] Error calling onFileSubmit prop:', err); 
+      }
+      finally { 
+          console.log('[FileUploader] handleSubmit finished.'); 
+      }
    };
-
+   
+  // Get appropriate file icon based on file type
+  const getFileIcon = () => {
+    if (!file) return <FileIcon className="h-6 w-6 text-primary" />;
+    
+    if (file.type === 'application/pdf' || file.name?.endsWith('.pdf')) {
+      return <FilePdf className="h-6 w-6 text-red-500" />;
+    }
+    
+    return <FileText className="h-6 w-6 text-primary" />;
+  };
+  
   // MnK Paper Info
   const mnkPaperUrl = "https://doi.org/10.1371/journal.pcbi.1005619";
-
-
+  
   return (
     <div className="space-y-6">
-
       {/* MnK Paper Summary Section */}
       {!file && (
         <div className="text-left p-6 border rounded-lg bg-muted/10 space-y-3">
@@ -108,19 +174,22 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
                 <Info className="h-5 w-5 text-primary/80 flex-shrink-0" />
                 <h3 className="text-base font-semibold">Paper Structure Analysis</h3>
             </div>
-            {/* ***** CORRECTED LINE WITH &gt; ***** */}
             <p className="text-sm text-muted-foreground leading-relaxed">
                 Mensh and Kording (PLoS Comput Biol, 2017) introduced a standard guide for structuring papers
                 (&gt;1M views, <a href={mnkPaperUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center">link <ExternalLink className="h-3 w-3 ml-0.5"/></a>).
                 This tool checks your paper's structure against that guide (e.g., <MnkTag ruleNum="1" />, <MnkTag ruleNum="2" />, <MnkTag ruleNum="3" />...).
                 Mouse over the <span className='font-mono bg-muted px-1 py-0.5 rounded text-xs'>MnK$</span> tags in the results for rule details.
             </p>
-            {/* Removed the <ol> list */}
         </div>
       )}
-
+      
       {/* File Dropzone Section */}
-      <div {...getRootProps()} className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${file ? 'bg-gray-50' : ''} ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}`}>
+      <div 
+        {...getRootProps()} 
+        className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors 
+          ${file ? 'bg-gray-50' : ''} 
+          ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}`}
+      >
          <input {...getInputProps()} />
          <div className="flex flex-col items-center justify-center space-y-4">
            <Cloud className="h-12 w-12 text-muted-foreground/50" />
@@ -128,23 +197,35 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
              <p className="text-lg font-medium">{isDragActive ? 'Drop the file here' : 'Drag and drop your paper file'}</p>
              <p className="text-sm text-muted-foreground">or click to browse files</p>
            </div>
-           <div className="text-xs text-muted-foreground max-w-md">Supported formats: .docx, .txt, .md, .tex<br />Maximum file size: 10MB</div>
+           <div className="text-xs text-muted-foreground max-w-md">
+             Supported formats: <strong>.pdf</strong>, .docx, .txt, .md, .tex<br />
+             Maximum file size: 10MB
+           </div>
          </div>
        </div>
-
+       
       {/* Selected File Info & Submit Button Section */}
       {file && (
         <div className="border rounded-lg p-4 space-y-4">
            <div className="flex items-center space-x-3">
-             <FileText className="h-6 w-6 text-primary" />
+             {getFileIcon()}
              <div>
                <p className="font-medium">{file.name}</p>
-               <p className="text-sm text-muted-foreground">{(file.size / 1024).toFixed(1)} KB {fileText && ` (~${fileText.length} chars extracted)`} {!fileText && ' (Server Extraction)'}</p>
+               <p className="text-sm text-muted-foreground">
+                 {(file.size / 1024).toFixed(1)} KB 
+                 {isExtracting && " (Extracting text...)"}
+                 {fileText && ` (~${fileText.length} chars extracted)`} 
+                 {!fileText && !isExtracting && ' (Server Extraction)'}
+               </p>
              </div>
            </div>
            <div className="flex justify-end">
-             <button onClick={handleSubmit} disabled={isProcessing} className="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
-               {isProcessing ? 'Processing...' : 'Analyze Paper Structure'}
+             <button 
+               onClick={handleSubmit} 
+               disabled={isProcessing || isExtracting} 
+               className="px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+             >
+               {isProcessing ? 'Processing...' : isExtracting ? 'Extracting Text...' : 'Analyze Paper Structure'}
              </button>
            </div>
          </div>
