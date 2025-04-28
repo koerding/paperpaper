@@ -1,5 +1,5 @@
 // File Path: src/services/AIService.js
-// Complete file using a JSON template in the prompt for the AI to fill
+// Complete file: Reinforced paragraph eval keys & issue generation rules in prompt
 
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
@@ -71,7 +71,7 @@ const loadRules = () => {
 
 // --- Main Analysis Function ---
 export async function analyzeDocumentStructure(document /* unused */, rawText) {
-  console.log('[AIService] Starting single-call analysis (fill-template prompt)...');
+  console.log('[AIService] Starting single-call analysis (fill-template prompt v3)...'); // Updated log
   const serviceStartTime = Date.now();
 
   try {
@@ -103,8 +103,20 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
     }
 
     // Prepare Rule Prompts (for AI reference)
-    const paragraphRulesPrompt = paragraphRules.rules?.map(rule => `Rule MnK${rule.originalRuleNumber}(ID:${rule.id}): ${rule.title}`).join('\n') || 'No paragraph rules loaded.';
-    const documentRulesPrompt = documentRules.rules?.map(rule => `Rule MnK${rule.originalRuleNumber}(ID:${rule.id}): ${rule.title}`).join('\n') || 'No document rules loaded.';
+    // Use rule IDs that correspond to the expected evaluation keys if possible
+    // Ensure these rules cover: cccStructure, sentenceQuality, topicContinuity, terminologyConsistency, structuralParallelism
+    const paragraphRulesPrompt = paragraphRules.rules?.map(rule => `
+### Paragraph Rule MnK${rule.originalRuleNumber || 'X'} (ID: ${rule.id}): ${rule.title}
+${rule.fullText}
+Checkpoints: ${rule.checkpoints?.map(cp => cp.description).join(', ') || 'N/A'}
+`).join('\n') || 'No paragraph rules loaded.';
+
+    const documentRulesPrompt = documentRules.rules?.map(rule => `
+### Document Rule MnK${rule.originalRuleNumber || 'X'} (ID: ${rule.id}): ${rule.title}
+${rule.fullText}
+Checkpoints: ${rule.checkpoints?.map(cp => cp.description).join(', ') || 'N/A'}
+`).join('\n') || 'No document rules loaded.';
+
 
     // Truncate Text
     const MAX_CHARS = 100000;
@@ -113,7 +125,7 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
         console.warn(`[AIService] Input text truncated from ${rawText.length} to ${MAX_CHARS} characters.`);
     }
 
-    // --- Define the FULL JSON Template ---
+    // Define the FULL JSON Template
     const jsonTemplate = JSON.stringify({
         title: "...", // To be filled by AI
         abstract: {
@@ -161,15 +173,19 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
     }, null, 2); // Pretty print for the prompt
 
 
-    // --- Prompt using JSON Template ---
+    // --- ***** REVISED PROMPT with specific instructions ***** ---
     const fullPrompt = `
 You are an expert scientific writing analyzer based on the Mensh & Kording (MnK) 10 Simple Rules paper. Analyze the provided paper text according to the rules listed below.
 
 **TASK:**
 1.  Read the **PAPER TEXT**.
 2.  Analyze the text based on the **EVALUATION RULES**.
-3.  **Fill in** the provided **JSON TEMPLATE** with your analysis results. Replace ALL placeholders like "..." and null values with your specific findings (extracted text, summaries, scores 1-10, boolean evaluations true/false, arrays of issues/recommendations).
-4.  **MnK$ Tagging:** For ALL feedback ("issue", "recommendation", "assessment" strings), prepend the text with "MnK{originalRuleNumber}: " IF the feedback directly relates to a specific rule listed below. Use the rule number from the EVALUATION RULES section (e.g., MnK1, MnK2,... MnK10). If feedback is general, do not add the tag.
+3.  **Fill in** the provided **JSON TEMPLATE** with your analysis results. Replace ALL placeholders like "..." and null values.
+4.  **Paragraph Evaluation Details:**
+    * For the "evaluations" object in EACH paragraph (and abstract), provide boolean flags (\`true\`/\`false\`) ONLY for these EXACT keys: **"cccStructure", "sentenceQuality", "topicContinuity", "terminologyConsistency", "structuralParallelism"**. Do NOT include other keys like 'cognitiveLoad' or 'logicalFlow'.
+    * For the "issues" array in EACH paragraph (and abstract): **IF any of the above boolean evaluation flags are \`false\`, you MUST add a corresponding issue object** describing the problem and a recommendation. Prepend rule-specific "issue" and "recommendation" text with "MnK{originalRuleNumber}: ". If all flags are \`true\`, the issues array should be empty \`[]\`.
+5.  **Document Assessment Details:** You MUST provide scores (1-10), assessments, and recommendations for ALL of the following keys: "titleQuality", "abstractCompleteness", "introductionStructure", "resultsOrganization", "discussionQuality", "messageFocus", "topicOrganization". Prepend rule-specific "assessment" and "recommendation" text with "MnK{originalRuleNumber}: ".
+6.  **Major Issues & Recommendations:** Populate these arrays, prepending rule-specific feedback with "MnK{originalRuleNumber}: ".
 
 **PAPER TEXT:**
 \`\`\`
@@ -189,16 +205,16 @@ ${jsonTemplate}
 
 **FINAL INSTRUCTIONS:**
 - Return ONLY the completed, valid JSON object based on the template.
-- Ensure ALL fields specified in the template (including all documentAssessment keys and all paragraph evaluation keys) are present and filled appropriately.
-- Use boolean \`true\` or \`false\` for the paragraph evaluation flags.
-- Use scores from 1 to 10 for document assessment.
-- Strictly follow the MnK$ tagging requirement for rule-specific feedback.
+- **Ensure ALL fields specified in the template (ALL documentAssessment keys, required paragraph 'evaluations' keys) are present and filled.**
+- **Use ONLY the specified boolean keys in paragraph 'evaluations'.**
+- **Generate an 'issue' item whenever a paragraph evaluation boolean is \`false\`.**
+- Strictly follow the MnK$ tagging requirement ("MnK{ruleNumber}: ").
 `;
-    // --- Prompt End ---
+    // --- ***** REVISED PROMPT END ***** ---
 
 
     // --- Make the Single API Call ---
-    safeLog('openai-request', 'Sending consolidated analysis request (fill-template)...');
+    safeLog('openai-request', 'Sending consolidated analysis request (v3 - corrected evals)...');
     const response = await openai.chat.completions.create({
         model: model,
         messages: [{ role: 'user', content: fullPrompt }],
@@ -238,9 +254,10 @@ ${jsonTemplate}
     // Safely count issues
     try {
       if (analysisResult.abstract) { countIssues(analysisResult.abstract.issues); }
+      // Count major issues directly from the top-level array
       if (analysisResult.majorIssues) {
           analysisResult.majorIssues.forEach(issue => {
-               if (issue?.severity === 'critical') criticalCount++;
+               if (issue?.severity === 'critical') criticalCount++; // Should ideally not be critical here, but check
                if (issue?.severity === 'major') majorCount++;
           });
       }
@@ -253,7 +270,6 @@ ${jsonTemplate}
        }
     } catch(countError) {
        console.error("[AIService] Error calculating statistics from AI results:", countError);
-       // Reset counts maybe? Or just log the error.
        criticalCount = -1; majorCount = -1; minorCount = -1; // Indicate error in stats
     }
 
@@ -270,7 +286,7 @@ ${jsonTemplate}
       sections: analysisResult.sections ?? [], // Provide empty array if missing
     };
 
-    // Add basic validation logging for key parts
+    // Basic validation logging for key parts
     if (typeof finalResults.documentAssessment !== 'object') { console.warn("Final results documentAssessment is not an object"); }
     if (!Array.isArray(finalResults.sections)) { console.warn("Final results sections is not an array"); }
 
