@@ -3,6 +3,14 @@ const nextConfig = {
   reactStrictMode: true,
   // Server Actions are now enabled by default in Next.js 14
   experimental: {},
+  // Add webpack configuration for PDF.js
+  webpack: (config) => {
+    // Required for PDF.js to work properly
+    config.resolve.alias.canvas = false;
+    config.resolve.alias.encoding = false;
+    
+    return config;
+  },
   async headers() {
     return [
       {
