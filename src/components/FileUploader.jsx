@@ -95,7 +95,7 @@ export default function FileUploader({ onFileSubmit, isProcessing }) {
         
         // Validation logic
         if (uploadedFile.size > maxSize) { 
-            setError('File is too large. Maximum size is 10MB.'); 
+            setError('File is too large. Maximum size is 200MB.'); 
             setFile(null); 
             return; 
         }
