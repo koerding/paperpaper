@@ -1,11 +1,5 @@
 // File Path: src/services/ProcessingService.client.js
 import mammoth from 'mammoth';
-// Import PDF.js library
-import * as pdfjsLib from 'pdfjs-dist';
-
-// Load PDF.js worker (required for PDF parsing)
-pdfjsLib.GlobalWorkerOptions.workerSrc = 
-  `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // Client-only debug logger
 const clientDebugLog = (prefix, content) => {
@@ -23,6 +17,13 @@ const clientDebugLog = (prefix, content) => {
 export async function extractTextFromPDF(arrayBuffer) {
   console.log('[ProcessingService.client] Extracting text from PDF...');
   try {
+    // Dynamically import PDF.js only when needed (client-side only)
+    const pdfjsLib = await import('pdfjs-dist/build/pdf');
+    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
+    
+    // Set the worker source
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+    
     // Load the PDF file
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const numPages = pdf.numPages;
