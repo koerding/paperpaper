@@ -1,5 +1,5 @@
 // File Path: src/services/AIService.js
-// Complete file: Reinforced paragraph eval keys & issue generation rules in prompt
+// Complete file using a JSON template in the prompt for the AI to fill
 
 import { default as OpenAI } from 'openai';
 import fs from 'fs';
@@ -71,7 +71,7 @@ const loadRules = () => {
 
 // --- Main Analysis Function ---
 export async function analyzeDocumentStructure(document /* unused */, rawText) {
-  console.log('[AIService] Starting single-call analysis (fill-template prompt v3)...'); // Updated log
+  console.log('[AIService] Starting single-call analysis (fill-template prompt v4)...'); // Updated log
   const serviceStartTime = Date.now();
 
   try {
@@ -102,21 +102,9 @@ export async function analyzeDocumentStructure(document /* unused */, rawText) {
         console.warn('[AIService] Warning: One or both rule sets appear empty. AI analysis may be limited.');
     }
 
-    // Prepare Rule Prompts (for AI reference)
-    // Use rule IDs that correspond to the expected evaluation keys if possible
-    // Ensure these rules cover: cccStructure, sentenceQuality, topicContinuity, terminologyConsistency, structuralParallelism
-    const paragraphRulesPrompt = paragraphRules.rules?.map(rule => `
-### Paragraph Rule MnK${rule.originalRuleNumber || 'X'} (ID: ${rule.id}): ${rule.title}
-${rule.fullText}
-Checkpoints: ${rule.checkpoints?.map(cp => cp.description).join(', ') || 'N/A'}
-`).join('\n') || 'No paragraph rules loaded.';
-
-    const documentRulesPrompt = documentRules.rules?.map(rule => `
-### Document Rule MnK${rule.originalRuleNumber || 'X'} (ID: ${rule.id}): ${rule.title}
-${rule.fullText}
-Checkpoints: ${rule.checkpoints?.map(cp => cp.description).join(', ') || 'N/A'}
-`).join('\n') || 'No document rules loaded.';
-
+    // Prepare Rule Prompts (for AI reference, used for MnK tagging)
+    const paragraphRulesPrompt = paragraphRules.rules?.map(rule => `Rule MnK${rule.originalRuleNumber}(ID:${rule.id}): ${rule.title}`).join('\n') || 'No paragraph rules loaded.';
+    const documentRulesPrompt = documentRules.rules?.map(rule => `Rule MnK${rule.originalRuleNumber}(ID:${rule.id}): ${rule.title}`).join('\n') || 'No document rules loaded.';
 
     // Truncate Text
     const MAX_CHARS = 100000;
@@ -125,22 +113,23 @@ Checkpoints: ${rule.checkpoints?.map(cp => cp.description).join(', ') || 'N/A'}
         console.warn(`[AIService] Input text truncated from ${rawText.length} to ${MAX_CHARS} characters.`);
     }
 
-    // Define the FULL JSON Template
+    // --- Define the FULL JSON Template ---
+    // This template explicitly lists ALL expected keys
     const jsonTemplate = JSON.stringify({
         title: "...", // To be filled by AI
         abstract: {
             text: "...", // To be filled by AI
             summary: "...", // To be filled by AI
-            evaluations: { // AI must fill these booleans based on Paragraph Rules
+            evaluations: { // AI must fill these specific booleans
                 cccStructure: null,
                 sentenceQuality: null,
                 topicContinuity: null,
                 terminologyConsistency: null,
                 structuralParallelism: null
             },
-            issues: [ /* { issue: "MnK#: ...", severity: "...", recommendation: "MnK#: ..." } */ ] // AI fills array
+            issues: [ /* { issue: "MnK#: ...", severity: "...", recommendation: "MnK#: ..." } */ ] // AI fills array if any eval is false
         },
-        documentAssessment: { // AI must fill ALL these objects based on Document Rules
+        documentAssessment: { // AI must fill ALL these objects
             titleQuality: { score: null, assessment: "...", recommendation: "..." },
             abstractCompleteness: { score: null, assessment: "...", recommendation: "..." },
             introductionStructure: { score: null, assessment: "...", recommendation: "..." },
@@ -152,39 +141,38 @@ Checkpoints: ${rule.checkpoints?.map(cp => cp.description).join(', ') || 'N/A'}
         majorIssues: [ /* { issue: "MnK#: ...", location: "...", severity: "...", recommendation: "MnK#: ..." } */ ], // AI fills array
         overallRecommendations: [ /* "MnK#: ..." */ ], // AI fills array
         sections: [
-            // AI should generate structure like this based on paper text
-            // Provide one example structure for AI guidance
+            // AI should generate structure like this based on paper
             {
-                name: "Example Section Name (e.g., Introduction) - Replace this",
+                name: "Section Name...", // AI replaces this
                 paragraphs: [
                     {
-                        text: "Example paragraph text - AI replaces this.",
-                        summary: "AI generates summary.",
-                        // AI fills these booleans based on Paragraph Rules
+                        text: "Paragraph text...", // AI replaces this
+                        summary: "...", // AI generates summary
+                        // AI fills these specific booleans
                         evaluations: { cccStructure: null, sentenceQuality: null, topicContinuity: null, terminologyConsistency: null, structuralParallelism: null },
-                         // AI fills array based on Paragraph Rules
+                         // AI fills array if any eval is false
                         issues: [ /* { issue: "MnK#:...", severity: "...", recommendation: "MnK#:..." } */ ]
                     }
-                    // AI should add more paragraph objects here as identified
+                    // AI adds more paragraph objects here
                 ]
             }
-            // AI should add more section objects here as identified
+            // AI adds more section objects here
         ]
     }, null, 2); // Pretty print for the prompt
 
 
-    // --- ***** REVISED PROMPT with specific instructions ***** ---
+    // --- ***** Prompt using JSON Template with Stronger Instructions ***** ---
     const fullPrompt = `
 You are an expert scientific writing analyzer based on the Mensh & Kording (MnK) 10 Simple Rules paper. Analyze the provided paper text according to the rules listed below.
 
 **TASK:**
 1.  Read the **PAPER TEXT**.
 2.  Analyze the text based on the **EVALUATION RULES**.
-3.  **Fill in** the provided **JSON TEMPLATE** with your analysis results. Replace ALL placeholders like "..." and null values.
+3.  **Fill in** the provided **JSON TEMPLATE** with your analysis results. Replace ALL placeholders like "..." and null values with your specific findings (extracted text, summaries, scores 1-10, boolean evaluations true/false, arrays of issues/recommendations).
 4.  **Paragraph Evaluation Details:**
-    * For the "evaluations" object in EACH paragraph (and abstract), provide boolean flags (\`true\`/\`false\`) ONLY for these EXACT keys: **"cccStructure", "sentenceQuality", "topicContinuity", "terminologyConsistency", "structuralParallelism"**. Do NOT include other keys like 'cognitiveLoad' or 'logicalFlow'.
-    * For the "issues" array in EACH paragraph (and abstract): **IF any of the above boolean evaluation flags are \`false\`, you MUST add a corresponding issue object** describing the problem and a recommendation. Prepend rule-specific "issue" and "recommendation" text with "MnK{originalRuleNumber}: ". If all flags are \`true\`, the issues array should be empty \`[]\`.
-5.  **Document Assessment Details:** You MUST provide scores (1-10), assessments, and recommendations for ALL of the following keys: "titleQuality", "abstractCompleteness", "introductionStructure", "resultsOrganization", "discussionQuality", "messageFocus", "topicOrganization". Prepend rule-specific "assessment" and "recommendation" text with "MnK{originalRuleNumber}: ".
+    * For the "evaluations" object in EACH paragraph (and abstract), provide boolean flags (\`true\`/\`false\`) ONLY for these EXACT keys: **"cccStructure", "sentenceQuality", "topicContinuity", "terminologyConsistency", "structuralParallelism"**. Do NOT include other keys.
+    * For the "issues" array in EACH paragraph (and abstract): **IF any of the above boolean evaluation flags are \`false\`, you MUST add a corresponding issue object** describing the problem and a recommendation. Prepend rule-specific "issue" and "recommendation" text with "MnK{originalRuleNumber}: ". If all flags are \`true\`, the issues array MUST be empty \`[]\`.
+5.  **Document Assessment Details:** You MUST provide scores (1-10), assessments, and recommendations for ALL of the following keys: "titleQuality", "abstractCompleteness", "introductionStructure", "resultsOrganization", "discussionQuality", "messageFocus", "topicOrganization". Prepend rule-specific feedback with "MnK{originalRuleNumber}: ".
 6.  **Major Issues & Recommendations:** Populate these arrays, prepending rule-specific feedback with "MnK{originalRuleNumber}: ".
 
 **PAPER TEXT:**
@@ -207,19 +195,19 @@ ${jsonTemplate}
 - Return ONLY the completed, valid JSON object based on the template.
 - **Ensure ALL fields specified in the template (ALL documentAssessment keys, required paragraph 'evaluations' keys) are present and filled.**
 - **Use ONLY the specified boolean keys in paragraph 'evaluations'.**
-- **Generate an 'issue' item whenever a paragraph evaluation boolean is \`false\`.**
+- **Generate an 'issue' item whenever a paragraph evaluation boolean is \`false\`. Make the 'issues' array empty otherwise.**
 - Strictly follow the MnK$ tagging requirement ("MnK{ruleNumber}: ").
 `;
     // --- ***** REVISED PROMPT END ***** ---
 
 
     // --- Make the Single API Call ---
-    safeLog('openai-request', 'Sending consolidated analysis request (v3 - corrected evals)...');
+    safeLog('openai-request', 'Sending consolidated analysis request (fill-template v4)...');
     const response = await openai.chat.completions.create({
         model: model,
         messages: [{ role: 'user', content: fullPrompt }],
-        response_format: { type: "json_object" }, // Ensure model supports this
-        temperature: 0.1, // Low temperature for better structure adherence
+        response_format: { type: "json_object" },
+        temperature: 0.1,
      });
     const analysisResultRaw = response.choices[0]?.message?.content;
     if (!analysisResultRaw) { throw new Error("OpenAI response content is empty."); }
@@ -231,7 +219,7 @@ ${jsonTemplate}
         safeLog('openai-response-parsed', 'Successfully parsed AI JSON response.');
     } catch (parseError) {
         console.error("[AIService] Failed to parse OpenAI JSON response:", parseError);
-        safeLog('openai-response-raw-on-error', analysisResultRaw); // Log raw on error
+        safeLog('openai-response-raw-on-error', analysisResultRaw);
         throw new Error(`Failed to parse analysis results from AI.`);
     }
 
@@ -251,13 +239,12 @@ ${jsonTemplate}
          }
      };
 
-    // Safely count issues
+    // Safely count issues from the parsed result
     try {
       if (analysisResult.abstract) { countIssues(analysisResult.abstract.issues); }
-      // Count major issues directly from the top-level array
       if (analysisResult.majorIssues) {
           analysisResult.majorIssues.forEach(issue => {
-               if (issue?.severity === 'critical') criticalCount++; // Should ideally not be critical here, but check
+               if (issue?.severity === 'critical') criticalCount++;
                if (issue?.severity === 'major') majorCount++;
           });
       }
@@ -270,31 +257,42 @@ ${jsonTemplate}
        }
     } catch(countError) {
        console.error("[AIService] Error calculating statistics from AI results:", countError);
-       criticalCount = -1; majorCount = -1; minorCount = -1; // Indicate error in stats
+       criticalCount = -1; majorCount = -1; minorCount = -1; // Indicate error
     }
 
 
     // --- Construct Final Output ---
-    // Assume AI filled the template; provide defaults only if top-level keys are missing
+    // Assume AI filled the template; provide defaults mainly if top-level keys are entirely missing
     const finalResults = {
-      title: analysisResult.title ?? "Title Not Found by AI", // Use nullish coalescing
+      title: analysisResult.title ?? "Title Not Provided by AI",
       abstract: analysisResult.abstract ?? { text: "", summary: "", evaluations: {}, issues: [] },
-      documentAssessment: analysisResult.documentAssessment ?? {}, // Provide empty obj if missing
-      majorIssues: analysisResult.majorIssues ?? [], // Provide empty array if missing
-      overallRecommendations: analysisResult.overallRecommendations ?? [], // Provide empty array if missing
+      documentAssessment: analysisResult.documentAssessment ?? {},
+      majorIssues: analysisResult.majorIssues ?? [],
+      overallRecommendations: analysisResult.overallRecommendations ?? [],
       statistics: { critical: criticalCount, major: majorCount, minor: minorCount },
-      sections: analysisResult.sections ?? [], // Provide empty array if missing
+      sections: analysisResult.sections ?? [],
+      // Add reportLinks back (assuming they are generated elsewhere or added later)
+      // reportLinks: analysisResult.reportLinks || {} // Or however you handle these
     };
 
-    // Basic validation logging for key parts
-    if (typeof finalResults.documentAssessment !== 'object') { console.warn("Final results documentAssessment is not an object"); }
+    // Add validation logging
+    if (typeof finalResults.documentAssessment !== 'object' || Object.keys(finalResults.documentAssessment).length === 0) {
+        console.warn("Final results documentAssessment is missing or empty.");
+    } else {
+        // Check if all expected keys are present
+        const expectedKeys = ['titleQuality', 'abstractCompleteness', 'introductionStructure', 'resultsOrganization', 'discussionQuality', 'messageFocus', 'topicOrganization'];
+        const missingKeys = expectedKeys.filter(k => !(k in finalResults.documentAssessment));
+        if (missingKeys.length > 0) {
+            console.warn(`Final results documentAssessment missing keys: ${missingKeys.join(', ')}`);
+        }
+    }
     if (!Array.isArray(finalResults.sections)) { console.warn("Final results sections is not an array"); }
 
 
     safeLog('final-results-structure-check', {
         titleExists: !!finalResults.title,
         abstractExists: !!finalResults.abstract,
-        docAssessmentKeys: finalResults.documentAssessment ? Object.keys(finalResults.documentAssessment).length : 0,
+        docAssessmentKeysCount: finalResults.documentAssessment ? Object.keys(finalResults.documentAssessment).length : 0,
         sectionsCount: finalResults.sections.length,
         stats: finalResults.statistics
      });
